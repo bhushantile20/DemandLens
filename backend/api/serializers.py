@@ -68,6 +68,7 @@ class ItemListSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
         fields = [
+            "id",
             "item_id",
             "item_name",
             "category",
