@@ -32,7 +32,7 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',')] if os.getenv('ALLOWED_HOSTS') else []
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    "http://localhost:5173", "https://demandlens-ui-gmejcpc0ebc8c0hu.southeastasia-01.azurewebsites.net"
 ]
 if os.getenv('CORS_ALLOWED_ORIGINS'):
     CORS_ALLOWED_ORIGINS += [origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS').split(',')]
