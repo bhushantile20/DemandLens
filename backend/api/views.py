@@ -1,8 +1,10 @@
 from datetime import date, timedelta
 
 from django.db.models import Sum, F
+from django.contrib.auth.models import User
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 
 from inventory.models import InventoryItem, InventoryStock
 from forecasting.models import ForecastResult
@@ -18,6 +20,16 @@ from .serializers import (
     DataQualityIssueSerializer,
     ConsumptionHistorySerializer,
 )
+
+DEMO_TOKEN = "demo-secret-2024"
+
+def get_demo_user(request):
+    """Return the superuser (demo user) if token is valid, else None."""
+    token = request.headers.get("X-Demo-Token", "")
+    if token != DEMO_TOKEN:
+        return None
+    return User.objects.filter(is_superuser=True).first()
+
 
 
 @api_view(["GET"])
@@ -122,3 +134,69 @@ def forecast_run(request):
     return Response(
         {"forecast_rows_created": created, "reorder_recommendations_created": recs}
     )
+
+
+# ──────────────────────────────────────────────────────────
+# User profile endpoints
+# ──────────────────────────────────────────────────────────
+
+@api_view(["PUT"])
+def user_update_name(request):
+    user = get_demo_user(request)
+    if not user:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    name = (request.data.get("name") or "").strip()
+    if not name:
+        return Response({"error": "Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(name) < 2:
+        return Response({"error": "Name must be at least 2 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+    parts = name.split(" ", 1)
+    user.first_name = parts[0]
+    user.last_name  = parts[1] if len(parts) > 1 else ""
+    user.save(update_fields=["first_name", "last_name"])
+
+    return Response({"success": True, "name": name})
+
+
+@api_view(["PUT"])
+def user_update_email(request):
+    user = get_demo_user(request)
+    if not user:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    email = (request.data.get("email") or "").strip()
+    if not email:
+        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if "@" not in email or "." not in email.split("@")[-1]:
+        return Response({"error": "Enter a valid email address."}, status=status.HTTP_400_BAD_REQUEST)
+    if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+        return Response({"error": "This email is already in use."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.email = email
+    user.save(update_fields=["email"])
+
+    return Response({"success": True, "email": email})
+
+
+@api_view(["PUT"])
+def user_update_password(request):
+    user = get_demo_user(request)
+    if not user:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    current_password = request.data.get("current_password", "")
+    new_password     = request.data.get("new_password", "")
+
+    if not current_password:
+        return Response({"error": "Current password is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if not new_password or len(new_password) < 8:
+        return Response({"error": "New password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
+    if not user.check_password(current_password):
+        return Response({"error": "Current password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+
+    return Response({"success": True})

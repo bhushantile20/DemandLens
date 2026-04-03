@@ -11,11 +11,10 @@ import ItemsList   from "./pages/ItemsList";
 import ItemDetail  from "./pages/ItemDetail";
 import Alerts      from "./pages/Alerts";
 import DataQuality from "./pages/DataQuality";
+import Settings    from "./pages/Settings";
 
 /**
  * AppShell — wraps authenticated pages with Sidebar + Navbar.
- * Only used on /dashboard, /items, /alerts, /data-quality.
- * Home and Login render WITHOUT this wrapper.
  */
 function AppShell({ children }) {
   return (
@@ -45,6 +44,7 @@ export default function App() {
         <Route path="/items/:id"     element={<AppShell><ItemDetail /></AppShell>} />
         <Route path="/alerts"        element={<AppShell><Alerts /></AppShell>} />
         <Route path="/data-quality"  element={<AppShell><DataQuality /></AppShell>} />
+        <Route path="/settings"      element={<AppShell><Settings /></AppShell>} />
 
         {/* ── Catch-all ── */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -10,4 +10,9 @@ urlpatterns = [
     path("alerts/reorder/", views.alerts_reorder, name="alerts-reorder"),
     path("data-quality/issues/", views.data_quality_issues, name="data-quality-issues"),
     path("forecast/run/", views.forecast_run, name="forecast-run"),
+
+    # ── User profile ──────────────────────────────────────
+    path("user/update-name/",     views.user_update_name,     name="user-update-name"),
+    path("user/update-email/",    views.user_update_email,    name="user-update-email"),
+    path("user/update-password/", views.user_update_password, name="user-update-password"),
 ]

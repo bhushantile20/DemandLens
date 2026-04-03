@@ -172,10 +172,10 @@ export default function Dashboard() {
           </div>
 
           {/* Bar Chart Panel */}
-          <div className="col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+          <div className="col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm p-6" style={{ minWidth: 0 }}>
             <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">Current Stock vs Reorder Level</h3>
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', height: 250 }}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={barData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
@@ -240,13 +240,13 @@ export default function Dashboard() {
 
           {/* Dynamic 7-Day Line Chart appearing when Row is Clicked */}
           {selectedItem && (
-            <div className="col-span-1 bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col">
+            <div className="col-span-1 bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col" style={{ minWidth: 0 }}>
               <h3 className="font-bold text-slate-900 mb-1">{selectedItem.item_name} Forecast</h3>
               <p className="text-xs text-slate-500 mb-6">Predicted Demand (Next 7 Days)</p>
               
-              <div className="flex-1 min-h-[250px] w-full">
+              <div style={{ width: '100%', height: 250 }}>
                 {itemForecastData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={250}>
                     <LineChart data={itemForecastData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} tickFormatter={(t) => t.substring(5)} />
@@ -256,7 +256,7 @@ export default function Dashboard() {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-sm text-slate-400">
+                  <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="text-sm text-slate-400">
                     Run global forecast first to generate data.
                   </div>
                 )}

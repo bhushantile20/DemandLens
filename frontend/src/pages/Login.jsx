@@ -11,6 +11,7 @@ import {
   BrainCircuit,
   BellRing,
   BarChart3,
+  PlayCircle,
 } from "lucide-react";
 
 const PERKS = [
@@ -19,12 +20,16 @@ const PERKS = [
   { icon: BarChart3,    text: "Interactive inventory analytics" },
 ];
 
+const DEMO_EMAIL    = "demo@inventoryai.com";
+const DEMO_PASSWORD = "demo1234";
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [demoRunning, setDemoRunning] = useState(false);
   const [error, setError]       = useState("");
 
   function handleSubmit(e) {
@@ -37,7 +42,41 @@ export default function Login() {
     }
 
     setLoading(true);
-    // Simulate auth — replace with real API call if needed
+    setTimeout(() => {
+      setLoading(false);
+      navigate("/dashboard");
+    }, 1200);
+  }
+
+  async function handleDemoLogin() {
+    if (demoRunning) return;
+    setDemoRunning(true);
+    setError("");
+    setEmail("");
+    setPassword("");
+
+    // --- type email char by char ---
+    for (let i = 0; i <= DEMO_EMAIL.length; i++) {
+      await new Promise((r) => setTimeout(r, 55));
+      setEmail(DEMO_EMAIL.slice(0, i));
+    }
+
+    await new Promise((r) => setTimeout(r, 300));
+
+    // --- type password char by char (shown as text briefly) ---
+    setShowPass(true);
+    for (let i = 0; i <= DEMO_PASSWORD.length; i++) {
+      await new Promise((r) => setTimeout(r, 80));
+      setPassword(DEMO_PASSWORD.slice(0, i));
+    }
+
+    await new Promise((r) => setTimeout(r, 400));
+    setShowPass(false);
+    await new Promise((r) => setTimeout(r, 200));
+
+    // --- submit ---
+    setDemoRunning(false);
+    setLoading(true);
     setTimeout(() => {
       setLoading(false);
       navigate("/dashboard");
@@ -125,7 +164,7 @@ export default function Login() {
           <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 p-8 md:p-10">
 
             {/* Header */}
-            <div className="mb-8">
+            <div className="mb-6">
               <h1 className="text-2xl font-extrabold text-slate-900 mb-1">
                 Welcome back
               </h1>
@@ -134,8 +173,38 @@ export default function Login() {
               </p>
             </div>
 
+            {/* ── DEMO LOGIN BUTTON ── */}
+            <button
+              id="demo-login-btn"
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={demoRunning || loading}
+              className="w-full mb-5 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border-2 border-dashed border-purple-300 bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 font-semibold text-sm hover:from-purple-100 hover:to-blue-100 hover:border-purple-400 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed group"
+            >
+              <PlayCircle className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
+              {demoRunning ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </span>
+                  Logging in with demo…
+                </span>
+              ) : (
+                "Try Demo Login"
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1 h-px bg-slate-100" />
+              <span className="text-xs text-slate-400 font-medium">or sign in manually</span>
+              <div className="flex-1 h-px bg-slate-100" />
+            </div>
+
             {/* Quick-fill hint */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-2.5 mb-6">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-2.5 mb-5">
               <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
               <p className="text-xs text-blue-700 leading-relaxed">
                 <span className="font-semibold">Demo mode:</span> Enter any email + password and click Sign In to access the dashboard.
@@ -208,7 +277,7 @@ export default function Login() {
               <button
                 id="login-submit"
                 type="submit"
-                disabled={loading}
+                disabled={loading || demoRunning}
                 className="bg-blue-600 text-white rounded-lg px-6 py-3 flex items-center justify-center gap-2 w-full font-semibold hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {loading ? (
