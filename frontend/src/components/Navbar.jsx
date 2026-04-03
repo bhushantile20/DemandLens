@@ -31,14 +31,61 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [open]);
 
-  const initials = user.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const bellRef = useRef(null);
+  
+  // Close Bell on outside click
+  useEffect(() => {
+    function handleOutside(e) {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
+        setBellOpen(false);
+      }
+    }
+    if (bellOpen) document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [bellOpen]);
+
+  // Command + K shortcut
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === "Escape") setSearchOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Fetch alerts
+  useEffect(() => {
+    import("../services/api").then((m) => {
+      m.getAlerts().then((res) => {
+        // filter for active alerts
+        const active = res.data.filter(a => a.status === 'pending' || a.status === 'watch' || a.risk_status === 'reorder_now');
+        setAlerts(res.data);
+      }).catch(() => {});
+    });
+  }, [pathname]);
+
+  const initials = user?.name
+    ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+    : "AI";
+
+  const criticalAlertsCount = alerts.filter(a => a.suggested_reorder_qty > 0).length;
+
+  const handleSearchNav = (path) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    navigate(path);
+  };
 
   return (
+    <>
     <header className="h-[60px] bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 shadow-sm" style={{ position: "relative", zIndex: 50 }}>
       {/* Left – breadcrumb + title */}
       <div>
@@ -53,17 +100,58 @@ export default function Navbar() {
       {/* Right – actions + user */}
       <div className="flex items-center gap-3">
         {/* Search pill */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-100 text-slate-400 text-xs px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
+        <div 
+          onClick={() => setSearchOpen(true)}
+          className="hidden md:flex items-center gap-2 bg-slate-100 text-slate-400 text-xs px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
           <Search className="w-3.5 h-3.5" />
           <span>Search…</span>
           <kbd className="ml-2 bg-white border border-slate-200 text-slate-400 text-[10px] px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
         </div>
 
         {/* Notification bell */}
-        <button className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition border border-slate-200">
-          <Bell className="w-4 h-4 text-slate-500" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-        </button>
+        <div ref={bellRef} className="relative">
+          <button 
+            onClick={() => setBellOpen(!bellOpen)}
+            className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition border border-slate-200">
+            <Bell className="w-4 h-4 text-slate-500" />
+            {criticalAlertsCount > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
+              </span>
+            )}
+          </button>
+          
+          {/* Notifications Dropdown */}
+          {bellOpen && (
+            <div className="absolute top-[calc(100%+8px)] right-0 w-72 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 flex flex-col overflow-hidden z-50">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">Notifications</span>
+                {criticalAlertsCount > 0 && (
+                  <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">{criticalAlertsCount} New</span>
+                )}
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {alerts.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">You're all caught up!</div>
+                ) : (
+                  alerts.slice(0, 5).map((alert, i) => (
+                    <div key={i} onClick={() => { setBellOpen(false); navigate('/alerts'); }} className="p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition flex flex-col gap-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-slate-800">{alert.item?.item_name || 'Restock Alert'}</span>
+                        <span className="text-[10px] text-slate-400">Just now</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500">Stock is critically low. Recommended reorder: <strong className="text-slate-700">{alert.suggested_reorder_qty}</strong> units.</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <button 
+                onClick={() => { setBellOpen(false); navigate('/alerts'); }}
+                className="w-full p-2.5 text-xs text-blue-600 font-semibold hover:bg-blue-50 transition text-center border-t border-slate-100">
+                View All Alerts
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="w-px h-6 bg-slate-200" />
@@ -215,6 +303,60 @@ export default function Navbar() {
         `}</style>
       </div>
     </header>
+
+      {/* Command Palette / Search Overlay */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setSearchOpen(false)}
+          />
+          
+          {/* Search Box */}
+          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl relative z-10 overflow-hidden border border-slate-200"
+               style={{ animation: 'openPalette 0.15s ease-out' }}>
+            <div className="flex items-center px-4 border-b border-slate-100">
+              <Search className="w-5 h-5 text-slate-400" />
+              <input 
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleSearchNav('/items'); 
+                }}
+                className="w-full bg-transparent border-none py-4 px-3 text-slate-700 focus:outline-none focus:ring-0 text-[15px]" 
+                placeholder="Where do you want to go?" 
+              />
+              <kbd className="hidden sm:inline-flex bg-slate-100 text-slate-400 text-[10px] px-1.5 py-0.5 rounded font-mono border border-slate-200">ESC</kbd>
+            </div>
+            
+            <div className="px-2 py-2">
+              <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-3 py-2">Quick Navigation</div>
+              <button onClick={() => handleSearchNav('/dashboard')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 hover:text-blue-600 text-slate-600 text-sm font-medium transition text-left">
+                <span className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded-md"><User className="w-3.5 h-3.5" /></span>
+                Dashboard
+              </button>
+              <button onClick={() => handleSearchNav('/items')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 hover:text-blue-600 text-slate-600 text-sm font-medium transition text-left">
+                <span className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded-md"><Search className="w-3.5 h-3.5" /></span>
+                Inventory & Catalog
+              </button>
+              <button onClick={() => handleSearchNav('/alerts')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 hover:text-blue-600 text-slate-600 text-sm font-medium transition text-left">
+                <span className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded-md"><Bell className="w-3.5 h-3.5" /></span>
+                Reorder Alerts
+              </button>
+            </div>
+          </div>
+          <style>{`
+            @keyframes openPalette {
+              from { opacity: 0; transform: scale(0.96) translateY(-10px); }
+              to { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
+    </>
   );
 }
 
