@@ -605,6 +605,9 @@ python manage.py createsuperuser
 # Seed the database with sample data
 python manage.py shell < seed_data.py
 
+# ALTERNATIVE: Seed with 2 years of patterned data for Machine Learning/Random Forest training
+python seed_data_enhanced.py
+
 # Start the development server
 python manage.py runserver
 # → Running at http://localhost:8000
