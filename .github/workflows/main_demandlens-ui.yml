@@ -26,16 +26,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
-      # 🚨 CRITICAL FIX 1: Passed the API URL to the build step
       - name: Build project
         env:
-          VITE_API_BASE_URL: 'https://replace-with-your-backend-api-url.azurewebsites.net/api' 
+          VITE_API_BASE_URL: 'https://demandlens-api.azurewebsites.net/api'   # ✅ your backend URL
         run: npm run build
 
-      # 🚨 CRITICAL FIX 2: Created PM2 ecosystem file to correctly serve the static React app
-      - name: Create PM2 config for Azure mapping
+      - name: Create PM2 config (serve React)
         run: |
           echo 'module.exports = { apps: [{ name: "frontend", script: "npx", args: "serve -s . -p 8080" }] };' > dist/ecosystem.config.js
 
@@ -43,11 +41,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: react-build
-          path: frontend/dist    # ✅ Now contains 'index.html', assets, and 'ecosystem.config.js'
+          path: frontend/dist
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
+
+    permissions:
+      id-token: write      # ✅ CRITICAL FIX (your error fix)
+      contents: read
 
     steps:
       - name: Download build artifact
