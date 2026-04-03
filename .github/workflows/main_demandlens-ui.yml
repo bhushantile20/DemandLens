@@ -31,6 +31,10 @@ jobs:
           VITE_API_BASE_URL: 'https://demandlens-api.azurewebsites.net/api'
         run: npm run build
 
+      - name: Create PM2 config for Azure mapping
+        run: |
+          echo 'module.exports = { apps: [{ name: "frontend", script: "npx", args: "serve -s . -p 8080" }] };' > dist/ecosystem.config.js
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -46,10 +50,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: react-build
+          path: .
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'demandlens-ui'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}   # ✅ THIS IS KEY
+          publish-profile: ${{ secrets.AZURE_FRONTEND_PUBLISH_PROFILE }}   # ✅ Update this to match the GitHub secret you created
           package: .
