@@ -12,7 +12,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: frontend   # ✅ no need to write cd again
+        working-directory: frontend
 
     steps:
       - name: Checkout code
@@ -26,16 +26,24 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
 
+      # 🚨 CRITICAL FIX 1: Passed the API URL to the build step
       - name: Build project
+        env:
+          VITE_API_BASE_URL: 'https://replace-with-your-backend-api-url.azurewebsites.net/api' 
         run: npm run build
+
+      # 🚨 CRITICAL FIX 2: Created PM2 ecosystem file to correctly serve the static React app
+      - name: Create PM2 config for Azure mapping
+        run: |
+          echo 'module.exports = { apps: [{ name: "frontend", script: "npx", args: "serve -s . -p 8080" }] };' > dist/ecosystem.config.js
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: react-build
-          path: frontend/dist   # ✅ final build output
+          path: frontend/dist    # ✅ Now contains 'index.html', assets, and 'ecosystem.config.js'
 
   deploy:
     runs-on: ubuntu-latest
