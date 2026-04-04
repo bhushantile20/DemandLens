@@ -297,33 +297,51 @@ def items_list(request):
 
     today = date.today()
     horizon_end = today + timedelta(days=7)
-    items = InventoryItem.objects.select_related("supplier").all()
+    items = InventoryItem.objects.select_related("supplier", "stock").all()
     data = []
+
     for item in items:
-        # attach next 7 days forecast sum
+        # ── Next-7-day forecast sum (all models averaged)
         forecast_sum = ForecastResult.objects.filter(
             item=item, forecast_date__gt=today, forecast_date__lte=horizon_end
         ).aggregate(total=Sum("predicted_demand"))
-        next7 = forecast_sum.get("total") or 0
+        next7 = float(forecast_sum.get("total") or 0)
 
-        # risk status from latest recommendation
+        # ── Latest reorder recommendation
         rec = (
             ReorderRecommendation.objects.filter(item=item)
             .order_by("-generated_at")
             .first()
         )
-        risk = "safe"
+        days_left = rec.days_of_stock_left if rec else None
+
+        # ── Stock metrics
+        stock = getattr(item, "stock", None)
+        qty          = float(stock.quantity_available) if stock else 0
+        reorder_lvl  = float(stock.reorder_level)      if stock else 0
+        stock_ratio  = round(qty / reorder_lvl, 2)     if reorder_lvl > 0 else None
+        is_overstock = (reorder_lvl > 0 and qty > 3 * reorder_lvl)
+
+        # ── 4-way status classification
         if rec and "reorder_now" in rec.explanation:
-            risk = "reorder_now"
+            risk = "critical"
         elif rec and "watch" in rec.explanation:
-            risk = "watch"
+            risk = "low"
+        elif is_overstock:
+            risk = "overstock"
+        else:
+            risk = "normal"
 
         serializer = ItemListSerializer(item, context={"request": request})
-        item_data = serializer.data
-        item_data["forecast_next_7d"] = float(next7)
-        item_data["risk_status"] = risk
+        item_data  = serializer.data
+        item_data["forecast_next_7d"]  = round(next7, 1)
+        item_data["risk_status"]       = risk          # normal | low | critical | overstock
+        item_data["days_of_stock_left"] = days_left
+        item_data["stock_ratio"]       = stock_ratio
         data.append(item_data)
+
     return Response(data)
+
 
 
 @api_view(["GET"])
