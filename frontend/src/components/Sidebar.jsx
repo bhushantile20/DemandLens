@@ -5,9 +5,11 @@ import {
   Bell,
   ShieldCheck,
   TrendingUp,
+  Activity,
   LogOut,
   Settings,
 } from "lucide-react";
+
 import { useUser } from "../context/UserContext";
 
 const NAV_GROUPS = [
@@ -27,8 +29,9 @@ const NAV_GROUPS = [
   {
     label: "Intelligence",
     items: [
-      { name: "Demand Forecast", icon: TrendingUp,    path: "/forecasting" },
-      { name: "Data Quality",   icon: ShieldCheck,    path: "/data-quality" },
+      { name: "Demand Forecast", icon: TrendingUp,  path: "/forecasting" },
+      { name: "Stock Health",    icon: Activity,    path: "/health" },
+      { name: "Data Quality",   icon: ShieldCheck, path: "/data-quality" },
     ],
   },
 ];

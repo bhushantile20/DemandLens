@@ -100,33 +100,71 @@ def analytics_abc_ranking(request):
 
 @api_view(["GET"])
 def analytics_inventory_health(request):
-    """Returns counts and % breakdown for Safe/Watch/Reorder items."""
-    items = InventoryItem.objects.all()
-    safe = watch = critical = 0
-    for item in items:
+    """
+    Returns Safe / Watch / Critical / Overstock counts + per-item detail.
+
+    Priority (highest wins):
+      1. Critical  – latest recommendation contains 'reorder_now'
+      2. Watch     – latest recommendation contains 'watch'
+      3. Overstock – current stock > 3 × reorder_level  (excess inventory)
+      4. Safe      – everything else
+    """
+    safe = watch = critical = overstock = 0
+    item_details = []
+
+    STATUS_PRIORITY = {"critical": 0, "watch": 1, "overstock": 2, "safe": 3}
+
+    for item in InventoryItem.objects.select_related("stock").all():
         rec = (
             ReorderRecommendation.objects.filter(item=item)
             .order_by("-generated_at")
             .first()
         )
-        if rec and "reorder_now" in rec.explanation:
-            critical += 1
-        elif rec and "watch" in rec.explanation:
-            watch += 1
-        else:
-            safe += 1
+        stock = getattr(item, "stock", None)
 
-    total = safe + watch + critical or 1
+        # Overstock: current stock is more than 3× the reorder threshold
+        is_overstock = (
+            stock is not None
+            and float(stock.reorder_level) > 0
+            and float(stock.quantity_available) > 3 * float(stock.reorder_level)
+        )
+
+        if rec and "reorder_now" in rec.explanation:
+            status = "critical";  critical  += 1
+        elif rec and "watch" in rec.explanation:
+            status = "watch";     watch     += 1
+        elif is_overstock:
+            status = "overstock"; overstock += 1
+        else:
+            status = "safe";      safe      += 1
+
+        item_details.append({
+            "name":          item.item_name,
+            "category":      item.category,
+            "status":        status,
+            "current_stock": round(float(stock.quantity_available), 1) if stock else 0,
+            "reorder_level": round(float(stock.reorder_level),      1) if stock else 0,
+            "days_left":     rec.days_of_stock_left if rec else None,
+        })
+
+    total = safe + watch + critical + overstock or 1
+    # Health score: only "safe" items count as healthy
     health_score = round((safe / total) * 100)
+
+    item_details.sort(key=lambda x: STATUS_PRIORITY[x["status"]])
+
     return Response({
-        "safe": safe, "watch": watch, "critical": critical,
+        "safe": safe, "watch": watch, "critical": critical, "overstock": overstock,
         "total": total, "health_score": health_score,
         "breakdown": [
-            {"name": "Safe",     "value": safe,     "color": "#10b981"},
-            {"name": "Watch",    "value": watch,    "color": "#f59e0b"},
-            {"name": "Critical", "value": critical, "color": "#ef4444"},
-        ]
+            {"name": "Safe",      "value": safe,      "color": "#10b981"},
+            {"name": "Watch",     "value": watch,     "color": "#f59e0b"},
+            {"name": "Critical",  "value": critical,  "color": "#ef4444"},
+            {"name": "Overstock", "value": overstock, "color": "#8b5cf6"},
+        ],
+        "items": item_details,
     })
+
 
 
 @api_view(["GET"])

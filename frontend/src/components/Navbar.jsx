@@ -7,6 +7,7 @@ const routeTitles = {
   "/dashboard":    "Dashboard",
   "/items":        "Inventory",
   "/forecasting":  "Demand Forecasting",
+  "/health":       "Stock Health Distribution",
   "/alerts":       "Reorder Alerts",
   "/data-quality": "Data Quality",
   "/settings":     "Settings",
