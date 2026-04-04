@@ -228,7 +228,73 @@ def analytics_turnover_rate(request):
 
 
 @api_view(["GET"])
+def analytics_stock_value(request):
+    """
+    Returns inventory financial value grouped by category.
+
+    For each item:  value = cost_per_unit × quantity_available
+    Groups totals by item.category, returns:
+      - categories  : list sorted by total value desc
+      - items        : every item with rank and % share
+      - grand_total  : total value of all inventory
+    """
+    items = InventoryItem.objects.select_related("stock", "supplier").all()
+
+    category_map  = {}   # { "Food": { "category", "value", "item_count" } }
+    item_details  = []
+    grand_total   = 0.0
+
+    for item in items:
+        stock = getattr(item, "stock", None)
+        qty   = float(stock.quantity_available) if stock else 0.0
+        cost  = float(item.cost_per_unit)
+        value = round(cost * qty, 2)
+        grand_total += value
+
+        cat = item.category or "Uncategorized"
+        if cat not in category_map:
+            category_map[cat] = {"category": cat, "value": 0.0, "item_count": 0}
+        category_map[cat]["value"]      = round(category_map[cat]["value"] + value, 2)
+        category_map[cat]["item_count"] += 1
+
+        item_details.append({
+            "name":          item.item_name,
+            "category":      cat,
+            "unit":          item.unit,
+            "quantity":      round(qty, 1),
+            "cost_per_unit": round(cost, 2),
+            "total_value":   value,
+        })
+
+    grand_total = round(grand_total, 2)
+
+    # Enrich categories with % share, sorted highest value first
+    categories = sorted(category_map.values(), key=lambda x: x["value"], reverse=True)
+    for cat in categories:
+        cat["pct"] = round((cat["value"] / grand_total) * 100, 1) if grand_total else 0
+
+    # Rank items by value, enrich with % share
+    item_details.sort(key=lambda x: x["total_value"], reverse=True)
+    for rank, item in enumerate(item_details, start=1):
+        item["rank"] = rank
+        item["pct"]  = round((item["total_value"] / grand_total) * 100, 2) if grand_total else 0
+
+    top_cat = categories[0] if categories else {}
+
+    return Response({
+        "categories":       categories,
+        "items":            item_details,
+        "grand_total":      grand_total,
+        "total_items":      len(item_details),
+        "total_categories": len(categories),
+        "top_category":     top_cat.get("category", "N/A"),
+        "top_category_pct": top_cat.get("pct", 0),
+    })
+
+
+@api_view(["GET"])
 def items_list(request):
+
     today = date.today()
     horizon_end = today + timedelta(days=7)
     items = InventoryItem.objects.select_related("supplier").all()

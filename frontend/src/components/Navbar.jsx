@@ -8,6 +8,7 @@ const routeTitles = {
   "/items":        "Inventory",
   "/forecasting":  "Demand Forecasting",
   "/health":       "Stock Health Distribution",
+  "/stock-value":  "Stock Value by Category",
   "/alerts":       "Reorder Alerts",
   "/data-quality": "Data Quality",
   "/settings":     "Settings",

@@ -16,6 +16,7 @@ urlpatterns = [
     path("analytics/abc-ranking/",            views.analytics_abc_ranking,            name="analytics-abc"),
     path("analytics/inventory-health/",       views.analytics_inventory_health,       name="analytics-health"),
     path("analytics/turnover-rate/",          views.analytics_turnover_rate,          name="analytics-turnover"),
+    path("analytics/stock-value/",            views.analytics_stock_value,            name="analytics-stock-value"),
 
     # ── User profile ──────────────────────────────────────
     path("user/update-name/",     views.user_update_name,     name="user-update-name"),

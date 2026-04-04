@@ -6,9 +6,11 @@ import {
   ShieldCheck,
   TrendingUp,
   Activity,
+  DollarSign,
   LogOut,
   Settings,
 } from "lucide-react";
+
 
 import { useUser } from "../context/UserContext";
 
@@ -29,9 +31,10 @@ const NAV_GROUPS = [
   {
     label: "Intelligence",
     items: [
-      { name: "Demand Forecast", icon: TrendingUp,  path: "/forecasting" },
-      { name: "Stock Health",    icon: Activity,    path: "/health" },
-      { name: "Data Quality",   icon: ShieldCheck, path: "/data-quality" },
+      { name: "Demand Forecast", icon: TrendingUp,   path: "/forecasting"  },
+      { name: "Stock Health",    icon: Activity,     path: "/health"       },
+      { name: "Stock Value",     icon: DollarSign,   path: "/stock-value"  },
+      { name: "Data Quality",   icon: ShieldCheck,  path: "/data-quality" },
     ],
   },
 ];
