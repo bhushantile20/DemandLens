@@ -6,7 +6,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, ComposedChart,
-  PieChart, Pie, Cell, RadialBarChart, RadialBar
+  PieChart, Pie, Cell, ReferenceLine
 } from 'recharts';
 import { Activity, Package, AlertTriangle, AlertCircle, RefreshCw, TrendingUp, DollarSign, ShieldCheck } from 'lucide-react';
 
@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [selectedItem, setSelectedItem]         = useState(null);
   const [itemForecastData, setItemForecastData] = useState([]);
   const [forecastLoading, setForecastLoading]   = useState(false);
+  const [forecastTodayMark, setForecastTodayMark] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -90,13 +91,30 @@ export default function Dashboard() {
     setForecastLoading(true);
     try {
       const res = await getItemForecast(item.id);
-      const grouped = res.data.forecast.reduce((acc, curr) => {
-        const d = curr.forecast_date;
-        if (!acc[d]) acc[d] = { date: d };
-        acc[d][curr.model_name] = parseFloat(curr.predicted_demand);
-        return acc;
-      }, {});
-      setItemForecastData(Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date)));
+
+      // ── HISTORY: last 14 days of actual consumption
+      const histMap = {};
+      res.data.history.slice(-14).forEach(h => {
+        if (!histMap[h.date]) histMap[h.date] = { date: h.date, actual: 0 };
+        histMap[h.date].actual += parseFloat(h.quantity_used);
+      });
+
+      // ── FORECAST: group by date, one key per model
+      const forecastMap = {};
+      res.data.forecast.forEach(f => {
+        const d = f.forecast_date;
+        if (!forecastMap[d]) forecastMap[d] = { date: d };
+        forecastMap[d][f.model_name] = parseFloat(f.predicted_demand);
+      });
+
+      // ── Merge history + forecast into single timeline
+      const allDates = [
+        ...Object.values(histMap).sort((a, b) => a.date.localeCompare(b.date)),
+        ...Object.values(forecastMap).sort((a, b) => a.date.localeCompare(b.date)),
+      ];
+
+      setItemForecastData(allDates);
+      setForecastTodayMark(Object.keys(histMap).sort().pop()); // last history date = today marker
     } catch (err) {
       console.error(err);
     } finally {
@@ -234,7 +252,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-slate-600" />
-              <h3 className="font-bold text-slate-900 text-sm">7-Day Demand Forecast</h3>
+              <h3 className="font-bold text-slate-900 text-sm">7-Day Demand Forecast (3 AI Models)</h3>
             </div>
             <select
               value={selectedItem?.id || ''}
@@ -252,15 +270,23 @@ export default function Dashboard() {
               <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
             </div>
           ) : itemForecastData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={itemForecastData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => t.substring(5)} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <Tooltip contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => t.substring(5)} interval="preserveStartEnd" />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                  formatter={(v, name) => [v != null ? Number(v).toFixed(1) + ' units' : '—', name]}
+                />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
-                <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                {forecastTodayMark && (
+                  <ReferenceLine x={forecastTodayMark} stroke="#cbd5e1" strokeDasharray="4 2" label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
+                )}
+                <Line type="monotone" dataKey="actual" name="Actual Consumption" stroke="#94a3b8" strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="monotone" dataKey="lstm" name="Deep Learning (LSTM)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="3 2" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           ) : (
