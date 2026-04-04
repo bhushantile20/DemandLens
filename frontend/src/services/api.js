@@ -14,7 +14,7 @@ api.interceptors.request.use((config) => {
 // ─── Existing endpoints ───────────────────────────────────────────
 export const getDashboardSummary = () => api.get('/dashboard/summary');
 export const getItems             = () => api.get('/items/');
-export const getItemForecast      = (id) => api.get(`/items/${id}/forecast/`);
+export const getItemForecast      = (id, days = 30) => api.get(`/items/${id}/forecast/?days=${days}`);
 export const getAlerts            = () => api.get('/alerts/reorder/');
 export const runForecast          = () => api.post('/forecast/run/');
 

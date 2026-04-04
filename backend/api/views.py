@@ -172,13 +172,22 @@ def item_detail(request, pk):
 @api_view(["GET"])
 def item_forecast(request, pk):
     item = InventoryItem.objects.get(pk=pk)
-    # history
-    history_qs = DailyConsumption.objects.filter(item=item, is_valid=True).order_by(
-        "date"
+
+    # Support ?days=N to limit history window (default: 30)
+    try:
+        days = max(7, int(request.query_params.get("days", 30)))
+    except (ValueError, TypeError):
+        days = 30
+    cutoff = date.today() - timedelta(days=days)
+
+    # history — aggregated by date so multi-department entries merge cleanly
+    history_qs = (
+        DailyConsumption.objects.filter(item=item, is_valid=True, date__gte=cutoff)
+        .order_by("date")
     )
     history = ConsumptionHistorySerializer(history_qs, many=True).data
 
-    # next 7 days forecast
+    # next 7 days forecast (all 3 models)
     today = date.today()
     horizon_end = today + timedelta(days=7)
     forecast_qs = ForecastResult.objects.filter(

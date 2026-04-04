@@ -70,15 +70,17 @@ def generate_reorder_recommendations(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
 
-        # suggested reorder qty: cover forecasted demand + safety_buffer - projected_stock
-        suggested = total_pred + safety_buffer - projected_stock
+        # suggested reorder qty: how much to order to cover demand + safety buffer
+        # = forecasted demand + safety_buffer - current_stock (if negative, no reorder needed)
+        suggested = total_pred + safety_buffer - current_stock
         if suggested < 0:
             suggested = Decimal("0")
         suggested = suggested.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+        # days of stock = current stock divided by avg daily consumption
         days_of_stock_left = Decimal("0")
         if avg_daily > 0:
-            days_of_stock_left = (projected_stock / avg_daily).quantize(
+            days_of_stock_left = (current_stock / avg_daily).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
 

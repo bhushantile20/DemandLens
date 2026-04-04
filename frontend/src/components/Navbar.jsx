@@ -4,11 +4,12 @@ import { Bell, Search, Settings, LogOut, ChevronDown, User } from "lucide-react"
 import { useUser } from "../context/UserContext";
 
 const routeTitles = {
-  "/dashboard":   "Dashboard",
-  "/items":       "Inventory",
-  "/alerts":      "Reorder Alerts",
-  "/data-quality":"Data Quality",
-  "/settings":    "Settings",
+  "/dashboard":    "Dashboard",
+  "/items":        "Inventory",
+  "/forecasting":  "Demand Forecasting",
+  "/alerts":       "Reorder Alerts",
+  "/data-quality": "Data Quality",
+  "/settings":     "Settings",
 };
 
 export default function Navbar() {

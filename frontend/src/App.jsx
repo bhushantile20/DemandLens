@@ -11,7 +11,9 @@ import ItemsList   from "./pages/ItemsList";
 import ItemDetail  from "./pages/ItemDetail";
 import Alerts      from "./pages/Alerts";
 import DataQuality from "./pages/DataQuality";
+import Forecasting from './pages/Forecasting';
 import Settings    from "./pages/Settings";
+
 
 /**
  * AppShell — wraps authenticated pages with Sidebar + Navbar.
@@ -42,6 +44,7 @@ export default function App() {
         <Route path="/dashboard"     element={<AppShell><Dashboard /></AppShell>} />
         <Route path="/items"         element={<AppShell><ItemsList /></AppShell>} />
         <Route path="/items/:id"     element={<AppShell><ItemDetail /></AppShell>} />
+        <Route path="/forecasting"    element={<AppShell><Forecasting /></AppShell>} />
         <Route path="/alerts"        element={<AppShell><Alerts /></AppShell>} />
         <Route path="/data-quality"  element={<AppShell><DataQuality /></AppShell>} />
         <Route path="/settings"      element={<AppShell><Settings /></AppShell>} />

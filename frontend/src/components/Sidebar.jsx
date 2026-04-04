@@ -27,7 +27,8 @@ const NAV_GROUPS = [
   {
     label: "Intelligence",
     items: [
-      { name: "Data Quality",  icon: ShieldCheck,     path: "/data-quality" },
+      { name: "Demand Forecast", icon: TrendingUp,    path: "/forecasting" },
+      { name: "Data Quality",   icon: ShieldCheck,    path: "/data-quality" },
     ],
   },
 ];

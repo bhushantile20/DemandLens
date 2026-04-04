@@ -84,7 +84,7 @@ export default function AlertCard({ item }) {
             <TrendingDown className="w-4 h-4 text-slate-400" />
             <span>Days of Stock:</span>
           </div>
-          <span className={`font-bold ${parseFloat(days_of_stock_left) < 5 ? 'text-red-600' : 'text-slate-800'}`}>
+          <span className={`font-bold ${parseFloat(days_of_stock_left) < 7 ? 'text-red-600' : 'text-slate-800'}`}>
             {days_of_stock_left > 0 ? `~${Number(days_of_stock_left).toFixed(0)} days` : "Stable"}
           </span>
         </div>
