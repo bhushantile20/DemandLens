@@ -24,7 +24,7 @@ def run_forecast(horizon=7):
     try:
         import numpy as np
         import pandas as pd
-        from statsmodels.tsa.holtwinters import ExponentialSmoothing
+        from statsmodels.tsa.arima.model import ARIMA
         from sklearn.ensemble import RandomForestRegressor
     except Exception:
         np = None
@@ -61,30 +61,30 @@ def run_forecast(horizon=7):
         last_date = full_dates[-1]
 
         # ==========================================
-        # MODEL 1: Exponential Smoothing (ETS)
+        # MODEL 1: ARIMA (Classic Statistical)
         # ==========================================
-        ets_forecast = []
-        if ExponentialSmoothing is not None and len(series) >= 7:
+        arima_forecast = []
+        if ARIMA is not None and len(series) >= 7:
             try:
-                # simple ETS without seasonality for MVP
-                model = ExponentialSmoothing(series, trend=None, seasonal=None)
-                fit = model.fit(optimized=True)
-                ets_forecast = list(fit.forecast(horizon))
+                # simple ARIMA(1,0,0) (AR-1 model) or ARIMA(1,1,1) if trend needed
+                model = ARIMA(series, order=(1, 1, 1))
+                fit = model.fit()
+                arima_forecast = list(fit.forecast(horizon))
             except Exception:
                 pass
 
-        if not ets_forecast:
+        if not arima_forecast:
             # fallback
             avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
-            ets_forecast = [avg for _ in range(horizon)]
+            arima_forecast = [avg for _ in range(horizon)]
 
-        for i, fv in enumerate(ets_forecast, start=1):
+        for i, fv in enumerate(arima_forecast, start=1):
             fdate = last_date + timedelta(days=i)
             predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             results_to_create.append(
                 ForecastResult(
                     item_id=item_id, forecast_date=fdate,
-                    predicted_demand=predicted, model_name='exponential_smoothing'
+                    predicted_demand=predicted, model_name='arima'
                 )
             )
 

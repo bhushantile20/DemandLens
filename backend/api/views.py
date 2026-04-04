@@ -346,9 +346,45 @@ def items_list(request):
 
 @api_view(["GET"])
 def item_detail(request, pk):
-    item = InventoryItem.objects.select_related("supplier").get(pk=pk)
+    item = InventoryItem.objects.select_related("supplier", "stock").get(pk=pk)
+
+    # ── Latest recommendation
+    rec       = ReorderRecommendation.objects.filter(item=item).order_by("-generated_at").first()
+    days_left = rec.days_of_stock_left if rec else None
+
+    # ── Stock metrics
+    stock        = getattr(item, "stock", None)
+    qty          = float(stock.quantity_available) if stock else 0
+    reorder_lvl  = float(stock.reorder_level)      if stock else 0
+    stock_ratio  = round(qty / reorder_lvl, 2)     if reorder_lvl > 0 else None
+    is_overstock = reorder_lvl > 0 and qty > 3 * reorder_lvl
+
+    # ── 7-day AI forecast total
+    today       = date.today()
+    horizon_end = today + timedelta(days=7)
+    forecast_sum = ForecastResult.objects.filter(
+        item=item, forecast_date__gt=today, forecast_date__lte=horizon_end
+    ).aggregate(total=Sum("predicted_demand"))
+    next7 = round(float(forecast_sum.get("total") or 0), 1)
+
+    # ── 4-way status classification (matches items_list logic)
+    if rec and "reorder_now" in rec.explanation:
+        risk = "critical"
+    elif rec and "watch" in rec.explanation:
+        risk = "low"
+    elif is_overstock:
+        risk = "overstock"
+    else:
+        risk = "normal"
+
     serializer = ItemDetailSerializer(item, context={"request": request})
-    return Response(serializer.data)
+    data = dict(serializer.data)
+    data["risk_status"]        = risk
+    data["days_of_stock_left"] = days_left
+    data["stock_ratio"]        = stock_ratio
+    data["forecast_next_7d"]   = next7
+
+    return Response(data)
 
 
 @api_view(["GET"])

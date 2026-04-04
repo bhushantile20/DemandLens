@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ComposedChart, Area, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine, Legend,
   PieChart, Pie, Cell,
 } from 'recharts';
+
 import { Activity, RefreshCw, TrendingUp, Cpu, Zap, ChevronDown, Gauge } from 'lucide-react';
 import { getItems, getItemForecast, runForecast, getTurnoverRate } from '../services/api';
 
@@ -89,7 +91,7 @@ export default function Forecasting() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [chartData, setChartData]       = useState([]);
   const [todayMarker, setTodayMarker]   = useState(null);
-  const [modelSums, setModelSums]       = useState({ ets: 0, rf: 0, lstm: 0 });
+  const [modelSums, setModelSums]       = useState({ arima: 0, rf: 0, lstm: 0 });
   const [forecastRows, setForecastRows] = useState([]);
   const [loading, setLoading]           = useState(false);
   const [running, setRunning]           = useState(false);
@@ -97,18 +99,33 @@ export default function Forecasting() {
   const [turnoverData, setTurnoverData]       = useState(null);
   const [turnoverLoading, setTurnoverLoading] = useState(true);
 
+  const location = useLocation();
+
   useEffect(() => {
     setItemsLoading(true);
     setTurnoverLoading(true);
+    const params   = new URLSearchParams(location.search);
+    const targetId = params.get('item') ? parseInt(params.get('item')) : null;
+
     getItems()
-      .then(res => { setItems(res.data); if (res.data.length > 0) loadForecast(res.data[0]); })
+      .then(res => {
+        setItems(res.data);
+        if (res.data.length > 0) {
+          const target = targetId
+            ? (res.data.find(i => i.id === targetId) || res.data[0])
+            : res.data[0];
+          loadForecast(target);
+        }
+      })
       .catch(console.error)
       .finally(() => setItemsLoading(false));
+
     getTurnoverRate()
       .then(res => setTurnoverData(res.data))
       .catch(console.error)
       .finally(() => setTurnoverLoading(false));
-  }, []);
+  }, [location.search]);
+
 
   const loadForecast = async (item) => {
     setSelectedItem(item);
@@ -121,13 +138,13 @@ export default function Forecasting() {
         histMap[h.date].actual += parseFloat(h.quantity_used);
       });
       const forecastMap = {};
-      const sums = { ets: 0, rf: 0, lstm: 0 };
+      const sums = { arima: 0, rf: 0, lstm: 0 };
       const rows = {};
       res.data.forecast.forEach(f => {
         const d = f.forecast_date, val = parseFloat(f.predicted_demand);
         if (!forecastMap[d]) forecastMap[d] = { date: d };
         if (!rows[d]) rows[d] = { date: d };
-        if (f.model_name === 'exponential_smoothing') { forecastMap[d].ets  = val; rows[d].ets  = val; sums.ets  += val; }
+        if (f.model_name === 'arima') { forecastMap[d].arima  = val; rows[d].arima  = val; sums.arima  += val; }
         if (f.model_name === 'random_forest')          { forecastMap[d].rf   = val; rows[d].rf   = val; sums.rf   += val; }
         if (f.model_name === 'lstm')                   { forecastMap[d].lstm = val; rows[d].lstm = val; sums.lstm += val; }
       });
@@ -197,7 +214,7 @@ export default function Forecasting() {
 
       {/* ══ ROW 1: Model Summary Cards ══ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        <ModelCard label="ETS · Statistical"    sublabel="Exponential Smoothing"   icon={Activity} value={modelSums.ets}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" />
+        <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" />
         <ModelCard label="Random Forest · ML"   sublabel="Ensemble Decision Trees" icon={Cpu}      value={modelSums.rf}   color="#8b5cf6" bg="#f5f3ff" border="#ddd6fe" />
         <ModelCard label="LSTM · Deep Learning" sublabel="Neural Network Model"    icon={Zap}      value={modelSums.lstm} color="#10b981" bg="#f0fdf4" border="#bbf7d0" />
       </div>
@@ -257,7 +274,7 @@ export default function Forecasting() {
                     label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
                 )}
                 <Area type="monotone" dataKey="actual" name="Actual Consumption" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" dot={false} connectNulls activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
-                <Line type="monotone" dataKey="ets"  name="ETS (Statistical)"    stroke="#3b82f6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="monotone" dataKey="arima"  name="ARIMA (Statistical)"    stroke="#3b82f6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="rf"   name="Random Forest (ML)"   stroke="#8b5cf6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="lstm" name="LSTM (Deep Learning)" stroke="#10b981" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
               </ComposedChart>
@@ -284,14 +301,14 @@ export default function Forecasting() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr style={{ background: '#f8fafc' }}>
-                    {['Date', 'ETS', 'RF', 'LSTM', 'Avg'].map(h => (
+                    {['Date', 'ARIMA', 'RF', 'LSTM', 'Avg'].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Date' ? 'left' : 'right', fontWeight: 600, fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {forecastRows.map((row, i) => {
-                    const vals = [row.ets, row.rf, row.lstm].filter(v => v != null);
+                    const vals = [row.arima, row.rf, row.lstm].filter(v => v != null);
                     const avg  = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
                     return (
                       <tr key={row.date} style={{ borderBottom: '1px solid #f8fafc', background: i % 2 === 0 ? '#fff' : '#fafbfc', transition: 'background 0.12s' }}
@@ -299,7 +316,7 @@ export default function Forecasting() {
                         onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafbfc'}
                       >
                         <td style={{ padding: '11px 12px', color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtDate(row.date)}</td>
-                        <td style={{ padding: '11px 12px', textAlign: 'right', color: '#3b82f6', fontWeight: 600 }}>{row.ets  != null ? Number(row.ets ).toFixed(1) : '—'}</td>
+                        <td style={{ padding: '11px 12px', textAlign: 'right', color: '#3b82f6', fontWeight: 600 }}>{row.arima  != null ? Number(row.arima ).toFixed(1) : '—'}</td>
                         <td style={{ padding: '11px 12px', textAlign: 'right', color: '#8b5cf6', fontWeight: 600 }}>{row.rf   != null ? Number(row.rf  ).toFixed(1) : '—'}</td>
                         <td style={{ padding: '11px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{row.lstm != null ? Number(row.lstm).toFixed(1) : '—'}</td>
                         <td style={{ padding: '11px 12px', textAlign: 'right' }}>
@@ -317,7 +334,7 @@ export default function Forecasting() {
 
               {/* Color key */}
               <div style={{ padding: '12px 14px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {[['ETS', '#3b82f6'], ['RF', '#8b5cf6'], ['LSTM', '#10b981']].map(([n, c]) => (
+                {[['ARIMA', '#3b82f6'], ['RF', '#8b5cf6'], ['LSTM', '#10b981']].map(([n, c]) => (
                   <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
                     <span style={{ fontSize: 11, color: '#64748b' }}>{n} model</span>

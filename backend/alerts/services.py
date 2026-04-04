@@ -12,7 +12,7 @@ from alerts.models import ReorderRecommendation
 
 
 def generate_reorder_recommendations(
-    lead_time=None, safety_buffer=None, model_name="exponential_smoothing"
+    lead_time=None, safety_buffer=None, model_name="arima"
 ):
     """
     For each InventoryStock, sum predicted demand over the lead-time window,

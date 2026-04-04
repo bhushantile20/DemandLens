@@ -284,7 +284,7 @@ export default function Dashboard() {
                   <ReferenceLine x={forecastTodayMark} stroke="#cbd5e1" strokeDasharray="4 2" label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
                 )}
                 <Line type="monotone" dataKey="actual" name="Actual Consumption" stroke="#94a3b8" strokeWidth={2} dot={false} connectNulls />
-                <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="monotone" dataKey="arima" name="Stat Model (ARIMA)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="lstm" name="Deep Learning (LSTM)" stroke="#10b981" strokeWidth={2.5} strokeDasharray="3 2" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
               </LineChart>
