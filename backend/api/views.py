@@ -122,10 +122,70 @@ def analytics_inventory_health(request):
         "safe": safe, "watch": watch, "critical": critical,
         "total": total, "health_score": health_score,
         "breakdown": [
-            {"name": "Safe", "value": safe, "color": "#10b981"},
-            {"name": "Watch", "value": watch, "color": "#f59e0b"},
+            {"name": "Safe",     "value": safe,     "color": "#10b981"},
+            {"name": "Watch",    "value": watch,    "color": "#f59e0b"},
             {"name": "Critical", "value": critical, "color": "#ef4444"},
         ]
+    })
+
+
+@api_view(["GET"])
+def analytics_turnover_rate(request):
+    """
+    Classify every InventoryItem by its average daily consumption over the
+    last 30 days and return bucketed counts + per-item detail.
+
+    Buckets:
+      Fast Moving   : avg_daily > 10
+      Medium Moving : 2 < avg_daily <= 10
+      Slow Moving   : 0 < avg_daily <= 2
+      Non Moving    : avg_daily == 0
+    """
+    PERIOD_DAYS = 30
+    cutoff = date.today() - timedelta(days=PERIOD_DAYS)
+
+    items = InventoryItem.objects.all()
+    fast = medium = slow = non_moving = 0
+    item_details = []
+
+    for item in items:
+        result = DailyConsumption.objects.filter(
+            item=item, is_valid=True, date__gte=cutoff
+        ).aggregate(total=Sum("quantity_used"))
+        total_consumed = float(result["total"] or 0)
+        avg_daily = total_consumed / PERIOD_DAYS
+
+        if avg_daily == 0:
+            speed = "non_moving"
+            non_moving += 1
+        elif avg_daily <= 2:
+            speed = "slow"
+            slow += 1
+        elif avg_daily <= 10:
+            speed = "medium"
+            medium += 1
+        else:
+            speed = "fast"
+            fast += 1
+
+        item_details.append({
+            "name": item.item_name,
+            "category": item.category,
+            "avg_daily": round(avg_daily, 2),
+            "speed": speed,
+        })
+
+    item_details.sort(key=lambda x: x["avg_daily"], reverse=True)
+
+    return Response({
+        "buckets": [
+            {"name": "Fast Moving",   "value": fast,       "color": "#10b981", "threshold": "> 10 units/day"},
+            {"name": "Medium Moving", "value": medium,     "color": "#3b82f6", "threshold": "2–10 units/day"},
+            {"name": "Slow Moving",   "value": slow,       "color": "#f59e0b", "threshold": "< 2 units/day"},
+            {"name": "Non Moving",    "value": non_moving, "color": "#ef4444", "threshold": "0 units"},
+        ],
+        "items": item_details,
+        "period_days": PERIOD_DAYS,
     })
 
 

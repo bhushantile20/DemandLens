@@ -22,6 +22,7 @@ export const runForecast          = () => api.post('/forecast/run/');
 export const getDepartmentConsumption = () => api.get('/analytics/department-consumption/');
 export const getAbcRanking            = () => api.get('/analytics/abc-ranking/');
 export const getInventoryHealth       = () => api.get('/analytics/inventory-health/');
+export const getTurnoverRate          = () => api.get('/analytics/turnover-rate/');
 
 // ─── User profile endpoints ───────────────────────────────────────
 export const updateName = (name) =>
