@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardSummary, getItems, getAlerts, runForecast, getItemForecast } from '../services/api';
 import Sidebar from '../components/Sidebar';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Activity, Package, AlertTriangle, AlertCircle, RefreshCw, ChevronRight, Bell } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -55,11 +55,17 @@ export default function Dashboard() {
     setSelectedItem(item);
     try {
       const res = await getItemForecast(item.id);
-      // Map API array to Recharts format: [{ date: '2026-03-22', demand: 45 }]
-      const formattedData = res.data.forecast.map(f => ({
-        date: f.forecast_date,
-        demand: parseFloat(f.predicted_demand)
-      }));
+      
+      // Group forecast data by date to combine models into one object per day
+      const grouped = res.data.forecast.reduce((acc, curr) => {
+        const date = curr.forecast_date;
+        if (!acc[date]) acc[date] = { date };
+        acc[date][curr.model_name] = parseFloat(curr.predicted_demand);
+        return acc;
+      }, {});
+      
+      // Convert mapping back to ordered array
+      const formattedData = Object.values(grouped).sort((a,b) => a.date.localeCompare(b.date));
       setItemForecastData(formattedData);
     } catch (error) {
       console.error("Error fetching line chart forecast:", error);
@@ -252,7 +258,9 @@ export default function Dashboard() {
                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} tickFormatter={(t) => t.substring(5)} />
                       <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
                       <Tooltip cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                      <Line type="monotone" dataKey="demand" name="Predicted Use" stroke="#3b82f6" strokeWidth={3} dot={{r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
+                      <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: "11px", color: '#64748b', paddingBottom: '10px'}} />
+                      <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={3} dot={{r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
+                      <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (

@@ -16,24 +16,21 @@ def _daterange(start_date, end_date):
         d += timedelta(days=1)
 
 
-def run_forecast(horizon=7, model_name="exponential_smoothing"):
+def run_forecast(horizon=7):
     """
     Build daily demand series per item from valid DailyConsumption rows and
-    produce forecasts saved to ForecastResult.
-
-    Rules:
-    - only use DailyConsumption where `is_valid=True` and `item` is set
-    - aggregate by item and date
-    - fill missing dates between min and max with 0
-    - if history length >= 7 days, attempt ExponentialSmoothing
-      otherwise fallback to average of recent values
+    produce dual forecasts (ETS + Random Forest) saved to ForecastResult.
     """
     try:
-        import pandas as pd  # optional, used for safety checks
+        import numpy as np
+        import pandas as pd
         from statsmodels.tsa.holtwinters import ExponentialSmoothing
+        from sklearn.ensemble import RandomForestRegressor
     except Exception:
+        np = None
         pd = None
         ExponentialSmoothing = None
+        RandomForestRegressor = None
 
     qs = (
         DailyConsumption.objects.filter(is_valid=True, item__isnull=False)
@@ -61,48 +58,94 @@ def run_forecast(horizon=7, model_name="exponential_smoothing"):
         full_dates = list(_daterange(start_date, end_date))
         value_map = {d: v for d, v in observations}
         series = [float(value_map.get(d, 0.0)) for d in full_dates]
+        last_date = full_dates[-1]
 
-        # decide whether to run ExponentialSmoothing
-        forecast_vals = []
+        # ==========================================
+        # MODEL 1: Exponential Smoothing (ETS)
+        # ==========================================
+        ets_forecast = []
         if ExponentialSmoothing is not None and len(series) >= 7:
             try:
                 # simple ETS without seasonality for MVP
                 model = ExponentialSmoothing(series, trend=None, seasonal=None)
                 fit = model.fit(optimized=True)
-                forecast_vals = list(fit.forecast(horizon))
+                ets_forecast = list(fit.forecast(horizon))
             except Exception:
-                forecast_vals = []
+                pass
 
-        if not forecast_vals:
-            # fallback: average of recent up-to-7 values
-            if len(series) == 0:
-                avg = 0.0
-            else:
-                recent = series[-7:]
-                avg = float(sum(recent) / len(recent))
-            forecast_vals = [avg for _ in range(horizon)]
+        if not ets_forecast:
+            # fallback
+            avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
+            ets_forecast = [avg for _ in range(horizon)]
 
-        last_date = full_dates[-1]
-        for i, fv in enumerate(forecast_vals, start=1):
+        for i, fv in enumerate(ets_forecast, start=1):
             fdate = last_date + timedelta(days=i)
-            predicted = Decimal(fv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             results_to_create.append(
                 ForecastResult(
-                    item_id=item_id,
-                    forecast_date=fdate,
-                    predicted_demand=predicted,
-                    model_name=model_name,
+                    item_id=item_id, forecast_date=fdate,
+                    predicted_demand=predicted, model_name='exponential_smoothing'
                 )
             )
 
-    # persist forecasts; ensure unique constraint handling by deleting existing
+        # ==========================================
+        # MODEL 2: Random Forest (Machine Learning)
+        # ==========================================
+        rf_forecast = []
+        if RandomForestRegressor is not None and len(series) >= 14:
+            try:
+                X, y = [], []
+                # Train on past data
+                for i in range(7, len(series)):
+                    d = full_dates[i]
+                    X.append([
+                        d.weekday(), 
+                        series[i-1], 
+                        series[i-7], 
+                        sum(series[i-7:i]) / 7.0
+                    ])
+                    y.append(series[i])
+                
+                rf = RandomForestRegressor(n_estimators=50, random_state=42)
+                rf.fit(X, y)
+                
+                # Autoregressively predict into the future
+                current_s = list(series)
+                current_d = list(full_dates)
+                for _ in range(horizon):
+                    nxt_d = current_d[-1] + timedelta(days=1)
+                    nxt_X = [[
+                        nxt_d.weekday(),
+                        current_s[-1],
+                        current_s[-7],
+                        sum(current_s[-7:]) / 7.0
+                    ]]
+                    pred = rf.predict(nxt_X)[0]
+                    rf_forecast.append(pred)
+                    current_s.append(pred)
+                    current_d.append(nxt_d)
+            except Exception:
+                pass
+                
+        if not rf_forecast:
+            # ML fallback
+            avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
+            rf_forecast = [avg for _ in range(horizon)]
+
+        for i, fv in enumerate(rf_forecast, start=1):
+            fdate = last_date + timedelta(days=i)
+            predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            results_to_create.append(
+                ForecastResult(
+                    item_id=item_id, forecast_date=fdate,
+                    predicted_demand=predicted, model_name='random_forest'
+                )
+            )
+
+    # persist forecasts; ensure unique constraint handling by clearing old
     if results_to_create:
         with transaction.atomic():
-            # determine forecast date range to clear for this model
-            all_dates = set(r.forecast_date for r in results_to_create)
-            ForecastResult.objects.filter(
-                model_name=model_name, forecast_date__in=all_dates
-            ).delete()
+            ForecastResult.objects.all().delete()
             ForecastResult.objects.bulk_create(results_to_create)
 
     return len(results_to_create)
