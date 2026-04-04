@@ -11,6 +11,11 @@ urlpatterns = [
     path("data-quality/issues/", views.data_quality_issues, name="data-quality-issues"),
     path("forecast/run/", views.forecast_run, name="forecast-run"),
 
+    # ── Analytics endpoints ───────────────────────────────────────
+    path("analytics/department-consumption/", views.analytics_department_consumption, name="analytics-department"),
+    path("analytics/abc-ranking/", views.analytics_abc_ranking, name="analytics-abc"),
+    path("analytics/inventory-health/", views.analytics_inventory_health, name="analytics-health"),
+
     # ── User profile ──────────────────────────────────────
     path("user/update-name/",     views.user_update_name,     name="user-update-name"),
     path("user/update-email/",    views.user_update_email,    name="user-update-email"),

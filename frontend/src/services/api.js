@@ -18,6 +18,11 @@ export const getItemForecast      = (id) => api.get(`/items/${id}/forecast/`);
 export const getAlerts            = () => api.get('/alerts/reorder/');
 export const runForecast          = () => api.post('/forecast/run/');
 
+// ─── Analytics endpoints ──────────────────────────────────────────
+export const getDepartmentConsumption = () => api.get('/analytics/department-consumption/');
+export const getAbcRanking            = () => api.get('/analytics/abc-ranking/');
+export const getInventoryHealth       = () => api.get('/analytics/inventory-health/');
+
 // ─── User profile endpoints ───────────────────────────────────────
 export const updateName = (name) =>
   api.put('/user/update-name/', { name });

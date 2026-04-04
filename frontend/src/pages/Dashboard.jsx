@@ -1,41 +1,106 @@
-import React, { useState, useEffect } from 'react';
-import { getDashboardSummary, getItems, getAlerts, runForecast, getItemForecast } from '../services/api';
-import Sidebar from '../components/Sidebar';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Activity, Package, AlertTriangle, AlertCircle, RefreshCw, ChevronRight, Bell } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  getDashboardSummary, getItems, getAlerts, runForecast,
+  getItemForecast, getDepartmentConsumption, getAbcRanking, getInventoryHealth
+} from '../services/api';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, Legend, ComposedChart,
+  PieChart, Pie, Cell, RadialBarChart, RadialBar
+} from 'recharts';
+import { Activity, Package, AlertTriangle, AlertCircle, RefreshCw, TrendingUp, DollarSign, ShieldCheck } from 'lucide-react';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const DEPT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+// ── Tooltip for Pareto Chart
+const ParetoTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+        <p style={{ fontWeight: 700, color: '#0f172a', margin: 0, fontSize: 13 }}>{label}</p>
+        {payload.map((p, i) => (
+          <p key={i} style={{ color: p.color, margin: '4px 0 0', fontSize: 12 }}>
+            {p.name}: <strong>{typeof p.value === 'number' && p.name.includes('%') ? p.value + '%' : '₹' + p.value?.toLocaleString()}</strong>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// ── Donut Center Label
+const DonutLabel = ({ cx, cy, score }) => (
+  <>
+    <text x={cx} y={cy - 8} textAnchor="middle" fill="#0f172a" fontSize={28} fontWeight={800}>{score}%</text>
+    <text x={cx} y={cy + 16} textAnchor="middle" fill="#64748b" fontSize={12}>Health Score</text>
+  </>
+);
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState(null);
-  const [items, setItems] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary]           = useState(null);
+  const [items, setItems]               = useState([]);
+  const [alerts, setAlerts]             = useState([]);
+  const [deptData, setDeptData]         = useState([]);
+  const [abcData, setAbcData]           = useState([]);
+  const [healthData, setHealthData]     = useState(null);
+  const [loading, setLoading]           = useState(true);
   const [runningForecast, setRunningForecast] = useState(false);
-  
-  // State for specific item forecast modal/chart
-  const [selectedItem, setSelectedItem] = useState(null);
+
+  // Item forecast state
+  const [selectedItem, setSelectedItem]         = useState(null);
   const [itemForecastData, setItemForecastData] = useState([]);
+  const [forecastLoading, setForecastLoading]   = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [sumRes, itemsRes, alertsRes] = await Promise.all([
+      const [sumRes, itemsRes, alertsRes, deptRes, abcRes, healthRes] = await Promise.all([
         getDashboardSummary(),
         getItems(),
-        getAlerts()
+        getAlerts(),
+        getDepartmentConsumption(),
+        getAbcRanking(),
+        getInventoryHealth(),
       ]);
       setSummary(sumRes.data);
       setItems(itemsRes.data);
       setAlerts(alertsRes.data);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      setDeptData(deptRes.data);
+      setAbcData(abcRes.data.slice(0, 10)); // Top 10 for Pareto
+      setHealthData(healthRes.data);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Auto-select first item for forecast
+  useEffect(() => {
+    if (items.length > 0 && !selectedItem) {
+      loadItemForecast(items[0]);
+    }
+  }, [items]);
+
+  const loadItemForecast = async (item) => {
+    setSelectedItem(item);
+    setForecastLoading(true);
+    try {
+      const res = await getItemForecast(item.id);
+      const grouped = res.data.forecast.reduce((acc, curr) => {
+        const d = curr.forecast_date;
+        if (!acc[d]) acc[d] = { date: d };
+        acc[d][curr.model_name] = parseFloat(curr.predicted_demand);
+        return acc;
+      }, {});
+      setItemForecastData(Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date)));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setForecastLoading(false);
     }
   };
 
@@ -43,236 +108,277 @@ export default function Dashboard() {
     setRunningForecast(true);
     try {
       await runForecast();
-      await fetchData(); // Refresh data to immediately see the new DB calculations
-    } catch (error) {
-      console.error("Error running forecast:", error);
+      await fetchAll();
+      if (selectedItem) loadItemForecast(selectedItem);
+    } catch (err) {
+      console.error(err);
     } finally {
       setRunningForecast(false);
-    }
-  };
-
-  const viewItemForecast = async (item) => {
-    setSelectedItem(item);
-    try {
-      const res = await getItemForecast(item.id);
-      
-      // Group forecast data by date to combine models into one object per day
-      const grouped = res.data.forecast.reduce((acc, curr) => {
-        const date = curr.forecast_date;
-        if (!acc[date]) acc[date] = { date };
-        acc[date][curr.model_name] = parseFloat(curr.predicted_demand);
-        return acc;
-      }, {});
-      
-      // Convert mapping back to ordered array
-      const formattedData = Object.values(grouped).sort((a,b) => a.date.localeCompare(b.date));
-      setItemForecastData(formattedData);
-    } catch (error) {
-      console.error("Error fetching line chart forecast:", error);
     }
   };
 
   if (loading && !summary) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-slate-500 text-sm font-medium">Loading analytics...</p>
+        </div>
       </div>
     );
   }
 
-  // Formatting Pie Chart Data based on current stock
-  const pieData = items.map(item => ({
-    name: item.item_name,
-    value: parseFloat(item.stock?.quantity_available || 0)
-  }));
-
-  // Formatting Bar Chart Data
   const barData = items.map(item => ({
-    name: item.item_name,
+    name: item.item_name.replace(/^(Premium |Large |Fresh |Organic )/, ''),
     stock: parseFloat(item.stock?.quantity_available || 0),
     reorderLevel: parseFloat(item.stock?.reorder_level || 0)
   }));
 
   return (
-    <div className="p-8 w-full font-sans max-w-7xl mx-auto">
-        
-        {/* Header */}
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
-            <p className="text-slate-500 mt-1">Real-time inventory intelligence and forecasting.</p>
-          </div>
-          <button 
-            onClick={handleRunForecast}
-            disabled={runningForecast}
-            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-blue-700 hover:shadow disabled:opacity-70 transition-all"
-          >
-            <RefreshCw className={`w-4 h-4 ${runningForecast ? 'animate-spin' : ''}`} />
-            {runningForecast ? 'Computing...' : 'Run Global Forecast'}
-          </button>
+    <div className="p-6 w-full bg-slate-50/60 min-h-full font-sans">
+
+      {/* ── Header ── */}
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Analytics Dashboard</h1>
+          <p className="text-slate-500 mt-0.5 text-sm">Real-time inventory intelligence, demand forecasting & stock analysis.</p>
         </div>
+        <button
+          onClick={handleRunForecast}
+          disabled={runningForecast}
+          className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:bg-blue-700 hover:shadow-md disabled:opacity-70 transition-all text-sm"
+        >
+          <RefreshCw className={`w-4 h-4 ${runningForecast ? 'animate-spin' : ''}`} />
+          {runningForecast ? 'Running AI Models...' : 'Run All Forecasts'}
+        </button>
+      </div>
 
-        {/* Top KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Total Items</p>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">{summary?.total_items || 0}</h2>
+      {/* ── ROW 1: KPI Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          {
+            label: 'Total Items', value: summary?.total_items || 0,
+            icon: <Package className="w-5 h-5" />, color: 'blue',
+            bg: 'bg-blue-50', text: 'text-blue-600', sub: 'Tracked SKUs in system'
+          },
+          {
+            label: 'Inventory Value', value: `₹${((summary?.total_inventory_value || 0) / 1000).toFixed(1)}K`,
+            icon: <DollarSign className="w-5 h-5" />, color: 'emerald',
+            bg: 'bg-emerald-50', text: 'text-emerald-600', sub: 'Total cost × quantity'
+          },
+          {
+            label: 'Health Score', value: `${healthData?.health_score || 0}%`,
+            icon: <ShieldCheck className="w-5 h-5" />, color: 'violet',
+            bg: 'bg-violet-50', text: 'text-violet-600', sub: `${healthData?.safe || 0} safe items`
+          },
+          {
+            label: 'Critical Alerts', value: alerts.filter(a => a.suggested_reorder_qty > 0).length,
+            icon: <AlertCircle className="w-5 h-5" />, color: 'red',
+            bg: 'bg-red-50', text: 'text-red-500', sub: 'Need immediate reorder'
+          },
+        ].map((kpi, i) => (
+          <div key={i} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{kpi.label}</p>
+              <p className="text-3xl font-extrabold text-slate-900 mt-1 leading-none">{kpi.value}</p>
+              <p className="text-xs text-slate-400 mt-1">{kpi.sub}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center"><Package className="w-6 h-6" /></div>
+            <div className={`w-11 h-11 ${kpi.bg} ${kpi.text} rounded-xl flex items-center justify-center shrink-0 ml-4`}>
+              {kpi.icon}
+            </div>
           </div>
+        ))}
+      </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Low Stock</p>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">{summary?.low_stock_count || 0}</h2>
-            </div>
-            <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center"><AlertTriangle className="w-6 h-6" /></div>
+      {/* ── ROW 2: Health Gauge + AI Forecast ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+        {/* Inventory Health Ring */}
+        <div className="bg-white border border-slate-100 rounded-xl shadow-sm p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck className="w-4 h-4 text-slate-600" />
+            <h3 className="font-bold text-slate-900 text-sm">Inventory Health</h3>
           </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Critical Alerts</p>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">{summary?.reorder_now_count || 0}</h2>
-            </div>
-            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-lg flex items-center justify-center"><AlertCircle className="w-6 h-6" /></div>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Data Issues</p>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">{summary?.issue_count || 0}</h2>
-            </div>
-            <div className="w-12 h-12 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center"><Activity className="w-6 h-6" /></div>
-          </div>
-        </div>
-
-        {/* Charts & Alerts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          
-          {/* Active Alerts Panel */}
-          <div className="col-span-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
-              <Bell className="w-5 h-5 text-slate-700" />
-              <h3 className="font-bold text-slate-900">Active Alerts</h3>
-            </div>
-            <div className="p-4 flex-1 overflow-y-auto max-h-[300px]">
-              {alerts.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center mt-4">System operating normally.</p>
-              ) : (
-                <div className="space-y-3">
-                  {alerts.map((alert, i) => (
-                    <div key={i} className={`p-4 rounded-lg flex items-start gap-3 border ${alert.status === 'CRITICAL' ? 'bg-red-50/50 border-red-100' : 'bg-amber-50/50 border-amber-100'}`}>
-                      <AlertTriangle className={`w-5 h-5 shrink-0 ${alert.status === 'CRITICAL' ? 'text-red-500' : 'text-amber-500'}`} />
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{alert.item_name}</p>
-                        <p className={`text-xs mt-1 ${alert.status === 'CRITICAL' ? 'text-red-700' : 'text-amber-700'}`}>
-                          {alert.explanation === 'reorder_now' ? `Will run out in ${alert.days_of_stock_left} days! Reorder ${alert.suggested_reorder_qty} units.` : `Stock is getting low. Watch closely.`}
-                        </p>
-                      </div>
-                    </div>
+          <div style={{ width: '100%', height: 180 }}>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={healthData?.breakdown || []}
+                  cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={80}
+                  dataKey="value" startAngle={90} endAngle={-270}
+                >
+                  {(healthData?.breakdown || []).map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
                   ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Bar Chart Panel */}
-          <div className="col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm p-6" style={{ minWidth: 0 }}>
-            <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">Current Stock vs Reorder Level</h3>
-            <div style={{ width: '100%', height: 250 }}>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={barData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                  <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                  <Bar dataKey="stock" name="Actual Stock" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="reorderLevel" name="Safety Threshold" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Detailed Items Table with Interactive Forecast Selection */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          <div className={`bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${selectedItem ? 'col-span-2' : 'col-span-3'}`}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-slate-900">Inventory Items</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-white border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
-                    <th className="px-6 py-4 font-semibold">Item Name</th>
-                    <th className="px-6 py-4 font-semibold">Stock</th>
-                    <th className="px-6 py-4 font-semibold">Risk Status</th>
-                    <th className="px-6 py-4 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((item) => (
-                    <tr key={item.item_id} className={`hover:bg-slate-50 transition-colors ${selectedItem?.item_id === item.item_id ? 'bg-blue-50/40' : ''}`}>
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-900">{item.item_name}</p>
-                        <p className="text-xs text-slate-500">{item.category}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-medium text-slate-900">{item.stock?.quantity_available || 0}</span>
-                        <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {item.risk_status === 'safe' && <span className="inline-flex bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold">Optimal</span>}
-                        {item.risk_status === 'watch' && <span className="inline-flex bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md text-xs font-bold">Watch</span>}
-                        {item.risk_status === 'reorder_now' && <span className="inline-flex bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-xs font-bold">Reorder Needed</span>}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => viewItemForecast(item)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-1 justify-end w-full"
-                        >
-                          View Forecast <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Dynamic 7-Day Line Chart appearing when Row is Clicked */}
-          {selectedItem && (
-            <div className="col-span-1 bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col" style={{ minWidth: 0 }}>
-              <h3 className="font-bold text-slate-900 mb-1">{selectedItem.item_name} Forecast</h3>
-              <p className="text-xs text-slate-500 mb-6">Predicted Demand (Next 7 Days)</p>
-              
-              <div style={{ width: '100%', height: 250 }}>
-                {itemForecastData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={itemForecastData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} tickFormatter={(t) => t.substring(5)} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
-                      <Tooltip cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                      <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: "11px", color: '#64748b', paddingBottom: '10px'}} />
-                      <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={3} dot={{r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
-                      <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="text-sm text-slate-400">
-                    Run global forecast first to generate data.
-                  </div>
+                </Pie>
+                {healthData && (
+                  <DonutLabel cx="50%" cy={90} score={healthData.health_score} />
                 )}
+                <Tooltip formatter={(v, n) => [v + ' items', n]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-around mt-2">
+            {(healthData?.breakdown || []).map((b, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />
+                <span className="text-xs text-slate-500 font-medium">{b.name}: <strong className="text-slate-700">{b.value}</strong></span>
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* AI Dual-Model Forecast Chart */}
+        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-slate-600" />
+              <h3 className="font-bold text-slate-900 text-sm">7-Day Demand Forecast</h3>
+            </div>
+            <select
+              value={selectedItem?.id || ''}
+              onChange={e => {
+                const item = items.find(i => i.id === parseInt(e.target.value));
+                if (item) loadItemForecast(item);
+              }}
+              className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-medium"
+            >
+              {items.map(it => <option key={it.id} value={it.id}>{it.item_name}</option>)}
+            </select>
+          </div>
+          {forecastLoading ? (
+            <div className="h-52 flex items-center justify-center">
+              <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+            </div>
+          ) : itemForecastData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={itemForecastData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => t.substring(5)} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                <Tooltip contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
+                <Line type="monotone" dataKey="exponential_smoothing" name="Stat Model (ETS)" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="random_forest" name="AI Model (RF)" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-52 flex items-center justify-center flex-col gap-2">
+              <RefreshCw className="w-5 h-5 text-slate-300" />
+              <p className="text-sm text-slate-400">Click "Run All Forecasts" to generate ML predictions.</p>
             </div>
           )}
-
         </div>
       </div>
+
+      {/* ── ROW 3: Pareto + Department Donut ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+
+        {/* ABC Pareto Chart */}
+        <div className="lg:col-span-3 bg-white border border-slate-100 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Activity className="w-4 h-4 text-slate-600" />
+            <h3 className="font-bold text-slate-900 text-sm">ABC Pareto Analysis</h3>
+          </div>
+          <p className="text-[11px] text-slate-400 mb-4 ml-6">Inventory value ranked by item · Cumulative % line (80/20 rule)</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <ComposedChart data={abcData} margin={{ top: 5, right: 30, left: 0, bottom: 50 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-40} textAnchor="end" interval={0} />
+              <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
+              <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+              <Tooltip content={<ParetoTooltip />} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: '#64748b', paddingTop: '10px' }} />
+              <Bar yAxisId="left" dataKey="value" name="Stock Value (₹)" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Line yAxisId="right" type="monotone" dataKey="cumulative_pct" name="Cumulative %" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#f59e0b' }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Department Consumption Donut */}
+        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-xl shadow-sm p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="w-4 h-4 text-slate-600" />
+            <h3 className="font-bold text-slate-900 text-sm">Consumption by Dept</h3>
+          </div>
+          {deptData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={170}>
+                <PieChart>
+                  <Pie data={deptData} dataKey="total" nameKey="department" cx="50%" cy="50%" outerRadius={70} innerRadius={35} paddingAngle={3}>
+                    {deptData.map((_, i) => (
+                      <Cell key={i} fill={DEPT_COLORS[i % DEPT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [v + ' units', n]} contentStyle={{ fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-col gap-1.5 mt-2">
+                {deptData.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: DEPT_COLORS[i % DEPT_COLORS.length] }} />
+                      <span className="text-xs text-slate-600 font-medium">{d.department}</span>
+                    </div>
+                    <span className="text-xs text-slate-500 font-semibold">{Number(d.total).toFixed(0)} units</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-400">No consumption data available.</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── ROW 4: Stock vs Reorder Level ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Stock vs Reorder Bar Chart */}
+        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-slate-600" />
+            <h3 className="font-bold text-slate-900 text-sm">Current Stock vs Reorder Threshold</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={barData} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <Tooltip contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
+              <Bar dataKey="stock" name="Actual Stock" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
+              <Bar dataKey="reorderLevel" name="Safety Threshold" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={30} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Active Alerts Feed */}
+        <div className="bg-white border border-slate-100 rounded-xl shadow-sm flex flex-col overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            <h3 className="font-bold text-slate-900 text-sm">Active Reorder Alerts</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-50 max-h-[250px]">
+            {alerts.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">✅ All systems operating normally.</p>
+            ) : (
+              alerts.slice(0, 8).map((alert, i) => (
+                <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
+                  <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${alert.suggested_reorder_qty > 0 ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">{alert.item?.item_name || 'Unknown'}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Reorder <span className="font-bold text-slate-700">{alert.suggested_reorder_qty}</span> units · {alert.alert_level?.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

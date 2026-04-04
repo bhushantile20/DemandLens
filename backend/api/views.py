@@ -42,14 +42,91 @@ def dashboard_summary(request):
         explanation__contains="reorder_now"
     ).count()
     issue_count = DataQualityIssue.objects.filter(resolved=False).count()
+
+    # Total inventory value (cost_per_unit × quantity_available)
+    total_value = 0
+    for stock in InventoryStock.objects.select_related("item").all():
+        total_value += float(stock.item.cost_per_unit) * float(stock.quantity_available)
+
     return Response(
         {
             "total_items": total_items,
             "low_stock_count": low_stock_count,
             "reorder_now_count": reorder_now_count,
             "issue_count": issue_count,
+            "total_inventory_value": round(total_value, 2),
         }
     )
+
+
+@api_view(["GET"])
+def analytics_department_consumption(request):
+    """Aggregate total quantity used grouped by department (last 30 & 90 days)."""
+    from django.utils import timezone
+    from datetime import timedelta
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
+
+    qs = (
+        DailyConsumption.objects.filter(is_valid=True, date__gte=thirty_days_ago)
+        .values("department")
+        .annotate(total=Sum("quantity_used"))
+        .order_by("-total")
+    )
+    return Response(list(qs))
+
+
+@api_view(["GET"])
+def analytics_abc_ranking(request):
+    """Rank items by inventory value (cost × stock) with cumulative % for Pareto."""
+    items = list(
+        InventoryItem.objects.select_related("stock").all()
+    )
+    ranked = []
+    for item in items:
+        stock_qty = float(item.stock.quantity_available) if hasattr(item, "stock") else 0
+        value = float(item.cost_per_unit) * stock_qty
+        ranked.append({"name": item.item_name, "value": round(value, 2), "category": item.category})
+
+    ranked.sort(key=lambda x: x["value"], reverse=True)
+    total_value = sum(r["value"] for r in ranked) or 1
+    cumulative = 0
+    for r in ranked:
+        cumulative += r["value"]
+        r["cumulative_pct"] = round((cumulative / total_value) * 100, 1)
+
+    return Response(ranked)
+
+
+@api_view(["GET"])
+def analytics_inventory_health(request):
+    """Returns counts and % breakdown for Safe/Watch/Reorder items."""
+    items = InventoryItem.objects.all()
+    safe = watch = critical = 0
+    for item in items:
+        rec = (
+            ReorderRecommendation.objects.filter(item=item)
+            .order_by("-generated_at")
+            .first()
+        )
+        if rec and "reorder_now" in rec.explanation:
+            critical += 1
+        elif rec and "watch" in rec.explanation:
+            watch += 1
+        else:
+            safe += 1
+
+    total = safe + watch + critical or 1
+    health_score = round((safe / total) * 100)
+    return Response({
+        "safe": safe, "watch": watch, "critical": critical,
+        "total": total, "health_score": health_score,
+        "breakdown": [
+            {"name": "Safe", "value": safe, "color": "#10b981"},
+            {"name": "Watch", "value": watch, "color": "#f59e0b"},
+            {"name": "Critical", "value": critical, "color": "#ef4444"},
+        ]
+    })
 
 
 @api_view(["GET"])
