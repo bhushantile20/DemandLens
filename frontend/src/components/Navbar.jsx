@@ -136,10 +136,14 @@ export default function Navbar() {
                   alerts.slice(0, 5).map((alert, i) => (
                     <div key={i} onClick={() => { setBellOpen(false); navigate('/alerts'); }} className="p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition flex flex-col gap-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-semibold text-slate-800">{alert.item?.item_name || 'Restock Alert'}</span>
-                        <span className="text-[10px] text-slate-400">Just now</span>
+                        <span className="text-xs font-semibold text-slate-800">{alert.item_name || 'Unknown Item'}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${alert.status === 'critical' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                          {(alert.status || 'watch').toUpperCase()}
+                        </span>
                       </div>
-                      <span className="text-[11px] text-slate-500">Stock is critically low. Recommended reorder: <strong className="text-slate-700">{alert.suggested_reorder_qty}</strong> units.</span>
+                      <span className="text-[11px] text-slate-500">
+                        Stock: <strong className="text-slate-700">{Number(alert.current_stock || 0).toFixed(0)}</strong> units · ~{alert.days_of_stock_left ?? '?'} days left
+                      </span>
                     </div>
                   ))
                 )}
