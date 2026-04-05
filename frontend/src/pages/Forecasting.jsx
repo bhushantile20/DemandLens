@@ -74,55 +74,67 @@ const TurnoverTooltip = ({ active, payload }) => {
 };
 
 // ─── Model Stat Card ─────────────────────────────────────────────────────────
-const ModelCard = ({ label, sublabel, icon: Icon, value, color, bg, border, mape, isRecommended }) => (
-  <div style={{
-    background: '#fff',
-    border: `1px solid ${border}`,
-    borderRadius: 14,
-    padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-  }}>
-    <div style={{ width: 48, height: 48, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <Icon style={{ width: 22, height: 22, color }} />
-    </div>
-    <div style={{ flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 0 }}>
-        <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
-        {isRecommended && (
-          <span style={{
-            fontSize: 9, fontWeight: 700, color: '#16a34a',
-            background: '#f0fdf4', border: '1px solid #bbf7d0',
-            borderRadius: 5, padding: '1px 6px', letterSpacing: '0.03em',
-            textTransform: 'uppercase',
-          }}>&#x2713; Recommended</span>
-        )}
-      </div>
-      <p style={{ fontSize: 11, color: '#cbd5e1', margin: '2px 0 5px' }}>{sublabel}</p>
-      <p style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1 }}>
-        {Number(value).toFixed(0)}
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8', marginLeft: 5 }}>units / 7d</span>
-      </p>
-    </div>
-    {/* MAPE accuracy badge */}
+const ModelCard = ({ label, sublabel, icon: Icon, value, color, bg, border, accuracy, isRecommended }) => {
+  const { mape, rmse, r2 } = accuracy || {};
+
+  // colour helpers
+  const mapeColor = mape == null ? '#cbd5e1' : mape < 10 ? '#16a34a' : mape < 20 ? '#b45309' : '#dc2626';
+  const mapeBg    = mape == null ? '#f8fafc' : mape < 10 ? '#f0fdf4' : mape < 20 ? '#fffbeb' : '#fef2f2';
+  const mapeB     = mape == null ? '#e2e8f0' : mape < 10 ? '#bbf7d0' : mape < 20 ? '#fde68a' : '#fca5a5';
+
+  const r2Color = r2 == null ? '#cbd5e1' : r2 >= 0.8 ? '#16a34a' : r2 >= 0.5 ? '#b45309' : '#dc2626';
+  const r2Bg    = r2 == null ? '#f8fafc' : r2 >= 0.8 ? '#f0fdf4' : r2 >= 0.5 ? '#fffbeb' : '#fef2f2';
+  const r2B     = r2 == null ? '#e2e8f0' : r2 >= 0.8 ? '#bbf7d0' : r2 >= 0.5 ? '#fde68a' : '#fca5a5';
+
+  return (
     <div style={{
-      textAlign: 'center', flexShrink: 0,
-      padding: '8px 12px',
-      background: mape == null ? '#f8fafc' : mape < 10 ? '#f0fdf4' : mape < 20 ? '#fffbeb' : '#fef2f2',
-      border: `1px solid ${mape == null ? '#e2e8f0' : mape < 10 ? '#bbf7d0' : mape < 20 ? '#fde68a' : '#fca5a5'}`,
-      borderRadius: 10,
-      minWidth: 64,
+      background: '#fff', border: `1px solid ${border}`, borderRadius: 14,
+      padding: '18px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
     }}>
-      <p style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Error</p>
-      <p style={{
-        fontSize: 16, fontWeight: 800, margin: 0,
-        color: mape == null ? '#cbd5e1' : mape < 10 ? '#16a34a' : mape < 20 ? '#b45309' : '#dc2626',
-      }}>
-        {mape != null ? `${mape}%` : '—'}
-      </p>
-      <p style={{ fontSize: 9, color: '#94a3b8', margin: '2px 0 0' }}>MAPE</p>
+      {/* Top row: icon + label + recommended badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon style={{ width: 22, height: 22, color }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+            {isRecommended && (
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 5, padding: '1px 6px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>&#x2713; Recommended</span>
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: '#cbd5e1', margin: '2px 0 0' }}>{sublabel}</p>
+        </div>
+        <p style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1, flexShrink: 0 }}>
+          {Number(value).toFixed(0)}
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8', marginLeft: 4 }}>u/7d</span>
+        </p>
+      </div>
+
+      {/* Metrics strip: MAPE | RMSE | R² */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        {/* MAPE */}
+        <div style={{ textAlign: 'center', padding: '7px 8px', background: mapeBg, border: `1px solid ${mapeB}`, borderRadius: 9 }}>
+          <p style={{ fontSize: 8, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MAPE</p>
+          <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: mapeColor }}>{mape != null ? `${mape}%` : '—'}</p>
+          <p style={{ fontSize: 8, color: '#94a3b8', margin: '1px 0 0' }}>% error</p>
+        </div>
+        {/* RMSE */}
+        <div style={{ textAlign: 'center', padding: '7px 8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 9 }}>
+          <p style={{ fontSize: 8, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RMSE</p>
+          <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: rmse != null ? '#3b82f6' : '#cbd5e1' }}>{rmse != null ? rmse.toFixed(1) : '—'}</p>
+          <p style={{ fontSize: 8, color: '#94a3b8', margin: '1px 0 0' }}>units</p>
+        </div>
+        {/* R² */}
+        <div style={{ textAlign: 'center', padding: '7px 8px', background: r2Bg, border: `1px solid ${r2B}`, borderRadius: 9 }}>
+          <p style={{ fontSize: 8, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>R²</p>
+          <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: r2Color }}>{r2 != null ? r2.toFixed(2) : '—'}</p>
+          <p style={{ fontSize: 8, color: '#94a3b8', margin: '1px 0 0' }}>fit score</p>
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function Forecasting() {
@@ -325,11 +337,11 @@ export default function Forecasting() {
     }
   }
 
-  // ── Module 5: Best Model Badge ──
+  // ── Module 5: Best Model Badge (lowest MAPE) ──
   const mapeEntries = [
-    { key: 'arima', val: accuracy.arima },
-    { key: 'random_forest', val: accuracy.random_forest },
-    { key: 'lstm', val: accuracy.lstm },
+    { key: 'arima',         val: accuracy.arima?.mape },
+    { key: 'random_forest', val: accuracy.random_forest?.mape },
+    { key: 'lstm',          val: accuracy.lstm?.mape },
   ].filter(e => e.val != null);
   const bestModel = mapeEntries.length > 0
     ? mapeEntries.reduce((a, b) => a.val <= b.val ? a : b).key
@@ -387,9 +399,9 @@ export default function Forecasting() {
 
       {/* ══ ROW 1: Model Summary Cards ══ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" mape={accuracy.arima}         isRecommended={bestModel === 'arima'} />
-        <ModelCard label="Random Forest · ML"   sublabel="Ensemble Decision Trees" icon={Cpu}      value={modelSums.rf}   color="#8b5cf6" bg="#f5f3ff" border="#ddd6fe" mape={accuracy.random_forest}  isRecommended={bestModel === 'random_forest'} />
-        <ModelCard label="LSTM · Deep Learning" sublabel="Neural Network Model"    icon={Zap}      value={modelSums.lstm} color="#10b981" bg="#f0fdf4" border="#bbf7d0" mape={accuracy.lstm}         isRecommended={bestModel === 'lstm'} />
+        <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" accuracy={accuracy.arima}         isRecommended={bestModel === 'arima'} />
+        <ModelCard label="Random Forest · ML"   sublabel="Ensemble Decision Trees" icon={Cpu}      value={modelSums.rf}   color="#8b5cf6" bg="#f5f3ff" border="#ddd6fe" accuracy={accuracy.random_forest}  isRecommended={bestModel === 'random_forest'} />
+        <ModelCard label="LSTM · Deep Learning" sublabel="Neural Network Model"    icon={Zap}      value={modelSums.lstm} color="#10b981" bg="#f0fdf4" border="#bbf7d0" accuracy={accuracy.lstm}         isRecommended={bestModel === 'lstm'} />
       </div>
 
       {/* ══ ROW 2: Forecast Chart (2/3) + 7-Day Table (1/3) ══ */}

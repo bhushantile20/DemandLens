@@ -25,12 +25,14 @@ class ForecastResultSerializer(serializers.ModelSerializer):
 
 
 class ReorderRecommendationSerializer(serializers.ModelSerializer):
-    item_id = serializers.CharField(source="item.item_id")
+    item_id   = serializers.CharField(source="item.item_id")
     item_name = serializers.CharField(source="item.item_name")
+    item_pk   = serializers.IntegerField(source="item.id")   # DB PK for /items/:id navigation
 
     class Meta:
         model = ReorderRecommendation
         fields = [
+            "item_pk",
             "item_id",
             "item_name",
             "current_stock",

@@ -413,47 +413,66 @@ def item_forecast(request, pk):
     ).order_by("forecast_date")
     forecast = ForecastResultSerializer(forecast_qs, many=True).data
 
-    # ── Module 4: Compute MAPE accuracy for each model ──────────────────────
-    # Strategy: compare each model's 7-day forecast avg/day vs actual avg/day
-    # from the last 7 days of real consumption. This is valid because MAPE
-    # measures how far predictions are from reality in percentage terms.
-    recent_start = today - timedelta(days=7)
-    recent_actual_qs = (
+    # ── Module 4: Compute MAPE, RMSE, R² ─────────────────────────────────────
+    # We compare each model's 7-day forecast daily values against the actual
+    # average daily consumption from the last 7 days.
+    # R² is properly bounded using the variance of actual daily values as SS_tot.
+    lookback_start = today - timedelta(days=14)
+
+    actual_qs = (
         DailyConsumption.objects.filter(
             item=item, is_valid=True,
-            date__gte=recent_start, date__lt=today
+            date__gte=lookback_start, date__lt=today,
         )
         .values("date")
         .annotate(total=Sum("quantity_used"))
     )
-    actual_by_day = [float(r["total"]) for r in recent_actual_qs if float(r["total"]) > 0]
-    avg_actual = sum(actual_by_day) / len(actual_by_day) if actual_by_day else None
+    actual_by_day = [float(r["total"]) for r in actual_qs if float(r["total"]) > 0]
+    avg_actual    = sum(actual_by_day) / len(actual_by_day) if actual_by_day else None
 
-    # Future forecasts: avg daily demand per model
-    future_forecast_qs = ForecastResult.objects.filter(
-        item=item, forecast_date__gt=today, forecast_date__lte=horizon_end
+    # Variance of the actual daily values (used as SS_tot baseline for R²)
+    actual_var = (
+        sum((a - avg_actual) ** 2 for a in actual_by_day) / len(actual_by_day)
+        if len(actual_by_day) > 1 else None
     )
 
-    model_totals = {"arima": [], "random_forest": [], "lstm": []}
-    for fr in future_forecast_qs:
-        if fr.model_name in model_totals:
-            model_totals[fr.model_name].append(float(fr.predicted_demand))
+    # Future 7-day forecast values per model
+    future_fc_qs = ForecastResult.objects.filter(
+        item=item, forecast_date__gt=today, forecast_date__lte=horizon_end
+    )
+    model_preds: dict[str, list[float]] = {"arima": [], "random_forest": [], "lstm": []}
+    for fr in future_fc_qs:
+        if fr.model_name in model_preds:
+            model_preds[fr.model_name].append(float(fr.predicted_demand))
 
-    def _mape_vs_actual(predicted_vals, actual_avg):
-        """MAPE: mean of |actual - pred| / actual × 100 across all forecast days"""
-        if not predicted_vals or actual_avg is None or actual_avg == 0:
-            return None
-        return round(
-            sum(abs(actual_avg - p) / actual_avg * 100 for p in predicted_vals) / len(predicted_vals),
-            1
-        )
+    def _metrics(preds):
+        """
+        MAPE  = mean |actual_avg - pred| / actual_avg × 100
+        RMSE  = sqrt(mean (actual_avg - pred)²)
+        R²    = 1 − MSE / var(actuals)   → properly bounded
+        """
+        if not preds or avg_actual is None or avg_actual == 0:
+            return {"mape": None, "rmse": None, "r2": None}
+
+        n    = len(preds)
+        mape = round(sum(abs(avg_actual - p) / avg_actual * 100 for p in preds) / n, 1)
+        mse  = sum((avg_actual - p) ** 2 for p in preds) / n
+        rmse = round(mse ** 0.5, 2)
+
+        if actual_var is not None and actual_var > 0:
+            r2 = round(max(-1.0, 1 - mse / actual_var), 3)
+        else:
+            r2 = None   # can't compute without variance in actuals
+
+        return {"mape": mape, "rmse": rmse, "r2": r2}
 
     accuracy = {
-        "arima":         _mape_vs_actual(model_totals["arima"], avg_actual),
-        "random_forest": _mape_vs_actual(model_totals["random_forest"], avg_actual),
-        "lstm":          _mape_vs_actual(model_totals["lstm"], avg_actual),
+        "arima":         _metrics(model_preds["arima"]),
+        "random_forest": _metrics(model_preds["random_forest"]),
+        "lstm":          _metrics(model_preds["lstm"]),
     }
-    # ────────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+
 
     # Module 10: Last updated timestamp
     latest = ForecastResult.objects.filter(item=item).order_by("-generated_at").first()

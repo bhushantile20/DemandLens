@@ -1,4 +1,5 @@
-import { Package2, Clock, Cpu, TrendingDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Package2, Clock, Cpu, TrendingDown, ChevronRight } from "lucide-react";
 
 function getStatusStyle(explanation) {
   const s = (explanation ?? "").toLowerCase();
@@ -22,7 +23,9 @@ function getStatusDot(explanation) {
 }
 
 export default function AlertCard({ item }) {
+  const navigate = useNavigate();
   const {
+    item_pk,
     item_name,
     current_stock,
     reorder_level,
@@ -49,9 +52,12 @@ export default function AlertCard({ item }) {
     : "text-green-600 font-bold";
 
   return (
-    <div className={`p-6 rounded-xl shadow-sm bg-white flex flex-col gap-3 h-full hover:shadow-md transition-all duration-200 border-l-4 ${
-      isCritical ? 'border-red-400' : isWatch ? 'border-amber-400' : 'border-green-400'
-    } border border-slate-100`}>
+    <div
+      onClick={() => item_pk && navigate(`/items/${item_pk}`)}
+      className={`p-6 rounded-xl shadow-sm bg-white flex flex-col gap-3 h-full hover:shadow-md transition-all duration-200 border-l-4 ${
+        isCritical ? 'border-red-400' : isWatch ? 'border-amber-400' : 'border-green-400'
+      } border border-slate-100 cursor-pointer group`}
+    >
       {/* Top: Name + Badge */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
@@ -64,10 +70,13 @@ export default function AlertCard({ item }) {
             {item_name ?? "—"}
           </p>
         </div>
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badge} shrink-0`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-          {statusLabel}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badge}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+            {statusLabel}
+          </span>
+          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+        </div>
       </div>
 
       {/* Bottom: Stats */}
