@@ -1,5 +1,7 @@
+import logging
+import warnings
 from collections import defaultdict
-from datetime import timedelta, date
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
@@ -8,6 +10,12 @@ from django.db.models import Sum
 from consumption.models import DailyConsumption
 from forecasting.models import ForecastResult
 
+from .estimators.ARIMA import run_arima
+from .estimators.random_forest import run_rf
+from .estimators.lstm import run_lstm
+
+logger = logging.getLogger(__name__)
+warnings.filterwarnings("ignore")
 
 def _daterange(start_date, end_date):
     d = start_date
@@ -15,22 +23,19 @@ def _daterange(start_date, end_date):
         yield d
         d += timedelta(days=1)
 
-
-def run_forecast(horizon=7):
+def run_forecast(horizon=7, val_days=14):
     """
-    Build daily demand series per item from valid DailyConsumption rows and
-    produce dual forecasts (ETS + Random Forest) saved to ForecastResult.
+    Decoupled ML Pipeline Orchestrator.
+    Handles data ingestion, preprocessing, calls the 3 standalone estimators,
+    and calculates the final weighted ensemble before saving to PostgreSQL.
     """
     try:
         import numpy as np
         import pandas as pd
-        from statsmodels.tsa.arima.model import ARIMA
-        from sklearn.ensemble import RandomForestRegressor
-    except Exception:
-        np = None
-        pd = None
-        ExponentialSmoothing = None
-        RandomForestRegressor = None
+        from sklearn.metrics import mean_absolute_percentage_error
+    except ImportError as e:
+        logger.error(f"Missing core numerical dependencies: {e}")
+        return 0
 
     qs = (
         DailyConsumption.objects.filter(is_valid=True, item__isnull=False)
@@ -39,7 +44,6 @@ def run_forecast(horizon=7):
         .order_by("item", "date")
     )
 
-    # group aggregated totals by item
     items_data = defaultdict(list)
     for row in qs:
         items_data[row["item"]].append((row["date"], float(row["total"])))
@@ -47,185 +51,123 @@ def run_forecast(horizon=7):
     results_to_create = []
 
     for item_id, observations in items_data.items():
-        observations.sort(key=lambda x: x[0])
-        dates = [d for d, _ in observations]
-        values = [v for _, v in observations]
+        try:
+            observations.sort(key=lambda x: x[0])
+            dates = [d for d, _ in observations]
+            
+            start_date = dates[0]
+            end_date = dates[-1]
+            full_dates = list(_daterange(start_date, end_date))
+            
+            value_map = {d: v for d, v in observations}
+            
+            series = []
+            for d in full_dates:
+                series.append(value_map.get(d, 0.0))
 
-        start_date = dates[0]
-        end_date = dates[-1]
+            df = pd.DataFrame({'date': full_dates, 'y': series})
+            df['date'] = pd.to_datetime(df['date'])
+            df.set_index('date', inplace=True)
 
-        # build complete series filling missing dates with 0
-        full_dates = list(_daterange(start_date, end_date))
-        value_map = {d: v for d, v in observations}
-        series = [float(value_map.get(d, 0.0)) for d in full_dates]
-        last_date = full_dates[-1]
+            cap = np.percentile(df['y'], 98) if len(df['y']) > 0 else 0
+            df['y_capped'] = np.clip(df['y'], 0, cap)
+            
+            y_arr = df['y_capped'].values
+            last_date = full_dates[-1]
 
-        # ==========================================
-        # MODEL 1: ARIMA (Classic Statistical)
-        # ==========================================
-        arima_forecast = []
-        if ARIMA is not None and len(series) >= 7:
-            try:
-                # simple ARIMA(1,0,0) (AR-1 model) or ARIMA(1,1,1) if trend needed
-                model = ARIMA(series, order=(1, 1, 1))
-                fit = model.fit()
-                arima_forecast = list(fit.forecast(horizon))
-            except Exception:
-                pass
+            models_val_preds = {}
+            models_future_preds = {}
 
-        if not arima_forecast:
-            # fallback
-            avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
-            arima_forecast = [avg for _ in range(horizon)]
-
-        for i, fv in enumerate(arima_forecast, start=1):
-            fdate = last_date + timedelta(days=i)
-            predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            results_to_create.append(
-                ForecastResult(
-                    item_id=item_id, forecast_date=fdate,
-                    predicted_demand=predicted, model_name='arima'
-                )
-            )
-
-        # ==========================================
-        # MODEL 2: Random Forest (Machine Learning)
-        # ==========================================
-        rf_forecast = []
-        if RandomForestRegressor is not None and len(series) >= 14:
-            try:
-                X, y = [], []
-                # Train on past data
-                for i in range(7, len(series)):
-                    d = full_dates[i]
-                    X.append([
-                        d.weekday(), 
-                        series[i-1], 
-                        series[i-7], 
-                        sum(series[i-7:i]) / 7.0
-                    ])
-                    y.append(series[i])
+            if len(y_arr) < val_days + 14:
+                avg = np.mean(y_arr[-7:]) if len(y_arr) > 0 else 0.0
+                future_fallback = np.full(horizon, avg)
+                models_future_preds = {
+                    'ensemble': future_fallback, 
+                    'arima': future_fallback, 
+                    'random_forest': future_fallback, 
+                    'lstm': future_fallback
+                }
+            else:
+                train_y = y_arr[:-val_days]
+                val_y   = y_arr[-val_days:]
                 
-                rf = RandomForestRegressor(n_estimators=50, random_state=42)
-                rf.fit(X, y)
+                def calc_mape(y_true, y_pred):
+                    return mean_absolute_percentage_error(y_true + 1e-5, y_pred + 1e-5)
+
+                # ==========================================
+                # EXECUTE EXTERNAL ESTIMATORS
+                # ==========================================
                 
-                # Autoregressively predict into the future
-                current_s = list(series)
-                current_d = list(full_dates)
-                for _ in range(horizon):
-                    nxt_d = current_d[-1] + timedelta(days=1)
-                    nxt_X = [[
-                        nxt_d.weekday(),
-                        current_s[-1],
-                        current_s[-7],
-                        sum(current_s[-7:]) / 7.0
-                    ]]
-                    pred = rf.predict(nxt_X)[0]
-                    rf_forecast.append(pred)
-                    current_s.append(pred)
-                    current_d.append(nxt_d)
-            except Exception:
-                pass
+                # 1. ARIMA
+                val_arima, fut_arima = run_arima(y_arr, val_days, horizon)
+                if fut_arima is not None:
+                    models_val_preds['arima'] = val_arima
+                    models_future_preds['arima'] = fut_arima
+
+                # 2. Random Forest
+                df['day_of_week'] = df.index.dayofweek
+                df['is_weekend'] = df.index.dayofweek.isin([5, 6]).astype(int)
+                df['month'] = df.index.month
+                df['lag_1'] = df['y_capped'].shift(1)
+                df['lag_7'] = df['y_capped'].shift(7)
+                df['lag_14'] = df['y_capped'].shift(14)
+                df['rolling_mean_7'] = df['y_capped'].rolling(7).mean()
+                df['rolling_std_7'] = df['y_capped'].rolling(7).std().fillna(0)
                 
-        if not rf_forecast:
-            # ML fallback
-            avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
-            rf_forecast = [avg for _ in range(horizon)]
+                rf_features = ['day_of_week', 'is_weekend', 'month', 'lag_1', 'lag_7', 'lag_14', 'rolling_mean_7', 'rolling_std_7']
+                val_rf, fut_rf = run_rf(df, val_days, horizon, rf_features)
+                if fut_rf is not None:
+                    models_val_preds['random_forest'] = val_rf
+                    models_future_preds['random_forest'] = fut_rf
 
-        for i, fv in enumerate(rf_forecast, start=1):
-            fdate = last_date + timedelta(days=i)
-            predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            results_to_create.append(
-                ForecastResult(
-                    item_id=item_id, forecast_date=fdate,
-                    predicted_demand=predicted, model_name='random_forest'
-                )
-            )
+                # 3. Deep Learning LSTM
+                val_lstm, fut_lstm = run_lstm(y_arr, val_days, horizon)
+                if fut_lstm is not None:
+                    models_val_preds['lstm'] = val_lstm
+                    models_future_preds['lstm'] = fut_lstm
 
-        # ==========================================
-        # MODEL 3: LSTM (Deep Learning - PyTorch)
-        # ==========================================
-        lstm_forecast = []
-        SEQ_LEN = 14  # look-back window for LSTM
-        if len(series) >= SEQ_LEN + horizon:
-            try:
-                import torch
-                import torch.nn as nn
+                # ==========================================
+                # INVERSE MAPE ENSEMBLE
+                # ==========================================
+                weights = {}
+                for m in ['arima', 'random_forest', 'lstm']:
+                    if m in models_val_preds and m in models_future_preds:
+                        mape = calc_mape(val_y, models_val_preds[m])
+                        weights[m] = 1.0 / (mape + 1e-4)
+                
+                total_weight = sum(weights.values())
+                future_ensemble = np.zeros(horizon)
+                active_models = []
 
-                # ── Normalize data to [0, 1]
-                s_arr = series
-                s_min = min(s_arr)
-                s_max = max(s_arr)
-                r = (s_max - s_min) or 1.0
+                if total_weight > 0:
+                    for m in weights:
+                        weights[m] /= total_weight
+                        future_ensemble += weights[m] * models_future_preds[m]
+                        active_models.append(m)
+                    models_future_preds['ensemble'] = future_ensemble
+                else:
+                    avg = np.mean(y_arr[-7:]) if len(y_arr) > 0 else 0.0
+                    future_ensemble = np.full(horizon, avg)
+                    models_future_preds['ensemble'] = future_ensemble
+                    
+                # Full compliance default fallbacks
+                for m in ['arima', 'random_forest', 'lstm']:
+                    if m not in models_future_preds:
+                        models_future_preds[m] = future_ensemble
 
-                def norm(v):   return (v - s_min) / r
-                def denorm(v): return v * r + s_min
+            for m, f_preds in models_future_preds.items():
+                for i, fv in enumerate(f_preds, start=1):
+                    fdate = last_date + timedelta(days=i)
+                    predicted = Decimal(max(0, float(fv))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    results_to_create.append(
+                        ForecastResult(
+                            item_id=item_id, forecast_date=fdate,
+                            predicted_demand=predicted, model_name=m
+                        )
+                    )
+        except Exception as e:
+            logger.error(f"Error forecasting item {item_id}: {e}")
 
-                normed = [norm(v) for v in s_arr]
-
-                # ── Build sequences  X:(N, SEQ_LEN, 1)  y:(N,)
-                X_seq, y_seq = [], []
-                for k in range(len(normed) - SEQ_LEN):
-                    X_seq.append(normed[k: k + SEQ_LEN])
-                    y_seq.append(normed[k + SEQ_LEN])
-
-                X_t = torch.tensor(X_seq, dtype=torch.float32).unsqueeze(-1)  # (N, SEQ_LEN, 1)
-                y_t = torch.tensor(y_seq, dtype=torch.float32).unsqueeze(-1)  # (N, 1)
-
-                # ── Tiny LSTM model
-                class DemandLSTM(nn.Module):
-                    def __init__(self):
-                        super().__init__()
-                        self.lstm   = nn.LSTM(input_size=1, hidden_size=32, num_layers=1, batch_first=True)
-                        self.dropout = nn.Dropout(0.1)
-                        self.fc     = nn.Linear(32, 1)
-
-                    def forward(self, x):
-                        out, _ = self.lstm(x)
-                        out = self.dropout(out[:, -1, :])  # use last timestep
-                        return self.fc(out)
-
-                model_lstm = DemandLSTM()
-                optimizer  = torch.optim.Adam(model_lstm.parameters(), lr=0.01)
-                criterion  = nn.MSELoss()
-
-                # ── Train for 30 epochs (fast, no GPU needed)
-                model_lstm.train()
-                for _ in range(30):
-                    optimizer.zero_grad()
-                    preds = model_lstm(X_t)
-                    loss  = criterion(preds, y_t)
-                    loss.backward()
-                    optimizer.step()
-
-                # ── Autoregressive prediction
-                model_lstm.eval()
-                window = list(normed[-SEQ_LEN:])
-                with torch.no_grad():
-                    for _ in range(horizon):
-                        inp  = torch.tensor([window[-SEQ_LEN:]], dtype=torch.float32).unsqueeze(-1)
-                        pred = model_lstm(inp).item()
-                        lstm_forecast.append(denorm(pred))
-                        window.append(pred)
-
-            except Exception as exc:
-                lstm_forecast = []   # will fall through to moving-average fallback
-
-        if not lstm_forecast:
-            avg = 0.0 if len(series) == 0 else float(sum(series[-7:]) / min(7, len(series)))
-            lstm_forecast = [avg for _ in range(horizon)]
-
-        for i, fv in enumerate(lstm_forecast, start=1):
-            fdate = last_date + timedelta(days=i)
-            predicted = Decimal(max(0, fv)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            results_to_create.append(
-                ForecastResult(
-                    item_id=item_id, forecast_date=fdate,
-                    predicted_demand=predicted, model_name='lstm'
-                )
-            )
-
-    # persist forecasts; ensure unique constraint handling by clearing old
     if results_to_create:
         with transaction.atomic():
             ForecastResult.objects.all().delete()

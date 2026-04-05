@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 
 const PERKS = [
-  { icon: BrainCircuit, text: "AI-powered demand predictions" },
-  { icon: BellRing,     text: "Real-time reorder alerts" },
-  { icon: BarChart3,    text: "Interactive inventory analytics" },
+  { icon: BrainCircuit, text: "Hybrid ML forecasts combining statistical and deep learning models" },
+  { icon: BellRing,     text: "Dynamic reorder recommendations based on predicted demand" },
+  { icon: BarChart3,    text: "Visual dashboards with real-time consumption and trend analysis" },
 ];
 
-const DEMO_EMAIL    = "demo@inventoryai.com";
+const DEMO_EMAIL    = "demo@demandlens.ai";
 const DEMO_PASSWORD = "demo1234";
 
 export default function Login() {
@@ -98,7 +98,7 @@ export default function Login() {
             <Zap className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-white tracking-tight">
-            Inventory<span className="text-blue-400">AI</span>
+            Demand<span className="text-blue-400">Lens</span>
           </span>
         </div>
 
@@ -134,13 +134,14 @@ export default function Login() {
         {/* Bottom stat row */}
         <div className="relative z-10 flex items-center gap-8 pt-8 border-t border-white/10">
           {[
-            { val: "94.2%", label: "Accuracy" },
-            { val: "~40%", label: "Cost Saved" },
-            { val: "Real-time", label: "Alerts" },
+            { val: "94.2%", label: "Accuracy",  sub: "On recent demand patterns" },
+            { val: "~40%",  label: "Cost Saved", sub: "Overstock & stockout reduction" },
+            { val: "Real-time", label: "Alerts", sub: "Instant inventory risk signals" },
           ].map((s) => (
             <div key={s.label}>
               <div className="text-lg font-bold text-white">{s.val}</div>
               <div className="text-xs text-slate-500">{s.label}</div>
+              <div className="text-[10px] text-slate-600 mt-0.5">{s.sub}</div>
             </div>
           ))}
         </div>
@@ -156,7 +157,7 @@ export default function Login() {
               <Zap className="w-4.5 h-4.5 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-800">
-              Inventory<span className="text-blue-600">AI</span>
+              Demand<span className="text-blue-600">Lens</span>
             </span>
           </div>
 
@@ -169,7 +170,7 @@ export default function Login() {
                 Welcome back
               </h1>
               <p className="text-sm text-slate-500">
-                Sign in to your InventoryAI account
+                Sign in to your <span className="font-semibold text-slate-700">DemandLens</span> account
               </p>
             </div>
 

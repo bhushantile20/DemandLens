@@ -1,173 +1,267 @@
-import { useNavigate, Link } from "react-router-dom";
-import { Zap, BrainCircuit, BellRing, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  Zap, BrainCircuit, BarChart3, ShieldCheck, ActivitySquare,
+  ArrowRight, Database, AlertTriangle, Target, TrendingUp,
+  CheckCircle2, ChevronRight
+} from "lucide-react";
+import { Area, AreaChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+const chartData = [
+  { day: "Mon", actual: 42, forecast: 45 },
+  { day: "Tue", actual: 38, forecast: 42 },
+  { day: "Wed", actual: 55, forecast: 52 },
+  { day: "Thu", actual: 61, forecast: 58 },
+  { day: "Fri", actual: 47, forecast: 51 },
+  { day: "Sat", actual: 35, forecast: 38 },
+  { day: "Sun", actual: 28, forecast: 32 },
+];
+
+const PERKS = [
+  { icon: BrainCircuit, text: "Hybrid ML forecasts combining statistical and deep learning models" },
+  { icon: ActivitySquare, text: "Dynamic reorder recommendations based on predicted demand and stock levels" },
+  { icon: BarChart3, text: "Visual dashboards with real-time consumption and trend analysis" },
+];
 
 export default function Home() {
   const navigate = useNavigate();
 
-  const features = [
-    {
-      icon: BrainCircuit,
-      title: "Demand Prediction",
-      desc: "Forecast demand with high accuracy.",
-    },
-    {
-      icon: BellRing,
-      title: "Reorder Alerts",
-      desc: "Get notified before stockouts occur.",
-    },
-    {
-      icon: BarChart3,
-      title: "Data Insights",
-      desc: "View clear analytics and track metrics.",
-    },
-  ];
-
   return (
-    <div className="w-full min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
-      {/* We use overflow-x-hidden strictly on this wrapper to prevent width blowing out, but keep it off body to save Sticky Nav */}
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{
+        fontFamily: "'Inter', system-ui, sans-serif",
+        background: "linear-gradient(145deg, #0B1220 0%, #0f1f3d 55%, #1a1040 100%)",
+        position: "relative",
+      }}
+    >
+      {/* Ambient blobs */}
+      <div style={{ position: "absolute", top: -100, right: 80, width: 500, height: 500, background: "rgba(59,130,246,0.13)", borderRadius: "50%", filter: "blur(90px)", pointerEvents: "none", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: -120, left: -60, width: 450, height: 450, background: "rgba(139,92,246,0.12)", borderRadius: "50%", filter: "blur(90px)", pointerEvents: "none", zIndex: 0 }} />
 
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="w-full max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-gray-900">InventoryAI</span>
-          </Link>
-
-          <div className="hidden md:flex gap-8 text-sm font-medium text-gray-500">
-            <a href="#home" className="hover:text-gray-900 transition-colors">Home</a>
-            <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
-            <a href="#about" className="hover:text-gray-900 transition-colors">About</a>
+      {/* ══════════════════════════════
+          NAVBAR
+      ══════════════════════════════ */}
+      <nav
+        className="relative z-10 flex items-center justify-between shrink-0"
+        style={{ height: 64, padding: "0 3rem", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #3B82F6, #7C3AED)", boxShadow: "0 0 20px rgba(59,130,246,0.35)" }}>
+            <Zap className="w-5 h-5 text-white" />
           </div>
-
-          <button
-            onClick={() => navigate("/login")}
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 hover:shadow-md transition-all"
-          >
-            Sign In
-          </button>
+          <span className="text-xl font-bold text-white tracking-tight">
+            Demand<span className="text-blue-400">Lens</span>
+          </span>
         </div>
+
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium" style={{ color: "#64748B" }}>
+          <a href="#" className="hover:text-white transition-colors">Features</a>
+          <a href="#" className="hover:text-white transition-colors">Architecture</a>
+          <a href="#" className="hover:text-white transition-colors">Demo</a>
+        </div>
+
+        <button
+          onClick={() => navigate("/login")}
+          className="flex items-center gap-2 text-sm font-bold text-white rounded-xl px-5 py-2.5 transition-all hover:opacity-90"
+          style={{ background: "#2563EB", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}
+        >
+          Login <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       </nav>
 
-      {/* HERO SECTION */}
-      <section id="home" className="w-full bg-grid-slate-50 relative">
-        <div className="relative w-full max-w-7xl mx-auto px-6 py-24 grid lg:grid-cols-2 gap-16 items-center">
+      {/* ══════════════════════════════
+          MAIN: LEFT HERO + RIGHT CARD
+      ══════════════════════════════ */}
+      <div className="relative z-10 flex-1 flex items-stretch overflow-hidden">
 
-          {/* LEFT CONTENT */}
-          <div className="space-y-6 max-w-xl z-10 w-full relative">
-            <h1 className="text-5xl lg:text-6xl font-extrabold leading-[1.1] text-gray-900 tracking-tight">
-              Smart Inventory <br /> Management with AI
-            </h1>
-            <p className="text-gray-600 text-xl font-medium max-w-md leading-relaxed">
-              Predict demand and manage your stock intelligently.
-            </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <button
-                onClick={() => navigate("/login")}
-                className="bg-blue-600 text-white px-7 py-3.5 rounded-xl font-semibold hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center"
-              >
-                Get Started
-              </button>
-              <a
-                href="#features"
-                className="bg-white border border-gray-200 text-gray-700 px-7 py-3.5 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center"
-              >
-                Learn More
-              </a>
-            </div>
-          </div>
+        {/* ── LEFT: Hero Text ── */}
+        <div
+          className="flex flex-col justify-between py-10"
+          style={{ width: "46%", padding: "2.5rem 3rem", flexShrink: 0 }}
+        >
+          {/* Top block */}
+          <div className="flex flex-col gap-7">
+            {/* Badge */}
+            <span
+              className="inline-flex items-center gap-2 w-fit text-xs font-semibold px-3.5 py-1.5 rounded-full"
+              style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", color: "#60A5FA" }}
+            >
+              Enterprise-grade Forecasting Engine
+            </span>
 
-          {/* RIGHT DASHBOARD MOCK */}
-          <div className="w-full flex justify-center lg:justify-end z-10">
-            {/* Tightly bound container pushing to the right margin properly */}
-            <div className="w-full max-w-[480px] bg-white border border-gray-100 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-              {/* Chrome Mock Window */}
-              <div className="flex gap-2 p-4 bg-gray-50/50 border-b border-gray-100">
-                <div className="w-3 h-3 bg-red-400 rounded-full shadow-sm"></div>
-                <div className="w-3 h-3 bg-amber-400 rounded-full shadow-sm"></div>
-                <div className="w-3 h-3 bg-green-400 rounded-full shadow-sm"></div>
-              </div>
-
-              {/* Data Display */}
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Dashboard</h3>
-                    <p className="text-xs text-gray-500 font-medium">Inventory Overview</p>
-                  </div>
-                  <span className="text-xs font-bold bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-md">
-                    Optimal
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="border border-gray-100 bg-gray-50/50 p-4 rounded-xl">
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Total</p>
-                    <p className="font-extrabold text-2xl text-gray-900">1,248</p>
-                  </div>
-                  <div className="border border-blue-100 bg-blue-50/50 p-4 rounded-xl">
-                    <p className="text-xs text-blue-600/80 font-semibold uppercase tracking-wider mb-1">Restock</p>
-                    <p className="font-extrabold text-2xl text-blue-600">12</p>
-                  </div>
-                </div>
-
-                {/* Growth Chart */}
-                <div className="flex items-end gap-2 h-36 mt-2 pt-4 bg-gray-50/30 rounded-lg p-2 border border-gray-50">
-                  {[45, 65, 40, 85, 70, 55, 95].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-blue-500 rounded-t-sm opacity-90"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section id="features" className="w-full py-24 bg-gray-50 border-y border-gray-100">
-        <div className="w-full max-w-7xl mx-auto px-6">
-          <div className="text-center md:text-left mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="max-w-xl">
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight">Key Features</h2>
-              <p className="text-gray-600 text-lg mt-3">
-                Everything you need to modernize your supply chain.
+            {/* Headline */}
+            <div>
+              <h1 className="font-extrabold text-white leading-snug tracking-tight" style={{ fontSize: "clamp(2.2rem, 3.5vw, 3rem)" }}>
+                Predict. Reorder.{" "}
+                <span style={{ background: "linear-gradient(90deg, #60A5FA, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  Optimize.
+                </span>
+              </h1>
+              <p className="mt-4 text-sm leading-relaxed" style={{ color: "#64748B", maxWidth: 380 }}>
+                DemandLens transforms raw inventory data into intelligent demand forecasts using a hybrid AI engine combining ARIMA, Random Forest, and LSTM models.
               </p>
             </div>
-          </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.title} className="p-8 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
-                    <Icon className="text-blue-600 w-6 h-6" strokeWidth={2} />
+            {/* Perks */}
+            <div className="flex flex-col gap-3.5">
+              {PERKS.map(({ icon: Icon, text }) => (
+                <div key={text} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                    <Icon className="w-4 h-4 text-blue-400" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{f.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">{f.desc}</p>
+                  <span className="text-sm font-medium" style={{ color: "#CBD5E1" }}>{text}</span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+              ))}
+            </div>
 
-      {/* FOOTER */}
-      <footer className="w-full py-8 bg-white border-t border-gray-100">
-        <div className="w-full max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500 font-medium">
-          <p>© {new Date().getFullYear()} InventoryAI</p>
-          <div className="flex gap-6 mt-4 sm:mt-0">
-            <a href="#" className="hover:text-gray-900 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-gray-900 transition-colors">Terms of Service</a>
+            {/* CTAs */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/login")}
+                className="flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-7 py-3.5 transition-all hover:scale-105"
+                style={{ background: "#2563EB", boxShadow: "0 0 30px rgba(37,99,235,0.4)" }}
+              >
+                Get Started <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                className="flex items-center gap-2 text-sm font-bold rounded-2xl px-7 py-3.5 transition-all hover:bg-white/10"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#94A3B8" }}
+              >
+                Learn More
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Stats */}
+          <div className="flex items-center gap-10 pt-6 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+            {[
+              { val: "94.2%", label: "Accuracy", sub: "On recent demand patterns" },
+              { val: "~40%", label: "Cost Saved", sub: "Overstock & stockout reduction" },
+              { val: "Real-time", label: "Alerts", sub: "Instant inventory risk signals" },
+            ].map((s) => (
+              <div key={s.label}>
+                <p className="text-lg font-bold text-white">{s.val}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "#475569" }}>{s.label}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: "#334155" }}>{s.sub}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </footer>
+
+        {/* ── RIGHT: Floating White Dashboard Card ── */}
+        <div className="flex-1 flex items-center justify-center py-6 pr-8 pl-4">
+          <div
+            className="w-full rounded-2xl flex flex-col gap-3 p-5"
+            style={{
+              background: "#ffffff",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)",
+              maxHeight: "calc(100vh - 112px)",
+              overflowY: "auto"
+            }}
+          >
+            {/* Card Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h2 className="text-base font-bold text-slate-900 tracking-tight">Inventory Dashboard</h2>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: "#EFF6FF", color: "#2563EB" }}>Live AI Preview</span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium">No data leakage • Real-world walk-forward validation</p>
+              </div>
+              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+                style={{ background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                System Optimal
+              </span>
+            </div>
+
+            {/* KPI Grid */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "Active Inventory", value: "1,248", icon: Database, color: "#3B82F6", bg: "#EFF6FF" },
+                { label: "Below Safety Threshold", value: "12", icon: AlertTriangle, color: "#EF4444", bg: "#FEF2F2" },
+                { label: "Forecast Accuracy (MAPE)", value: "94.2%", icon: Target, color: "#8B5CF6", bg: "#F5F3FF" },
+                { label: "AI Suggested Reorder", value: "86u", icon: TrendingUp, color: "#10B981", bg: "#F0FDF4" },
+              ].map((k) => {
+                const Icon = k.icon;
+                return (
+                  <div key={k.label} className="p-3 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-sm transition-all flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: k.bg }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: k.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{k.label}</p>
+                      <p className="text-base font-extrabold text-slate-900 tracking-tight">{k.value}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Chart */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-xs font-bold text-slate-700">7-Day Demand Forecast</p>
+                  <p className="text-[9px] text-slate-400 font-medium mt-0.5">Ensemble prediction across ARIMA, RF & LSTM</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" /> Historical
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" /> AI Forecast
+                  </span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={110}>
+                <AreaChart data={chartData} margin={{ top: 2, right: 5, left: -28, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gF" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#94A3B8", fontWeight: 600 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#94A3B8", fontWeight: 600 }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", fontSize: 10, fontWeight: 600 }} />
+                  <Area type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} fill="url(#gA)" dot={{ r: 2.5, fill: "#3b82f6", stroke: "#fff", strokeWidth: 1.5 }} />
+                  <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={2} strokeDasharray="5 4" fill="url(#gF)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Mini feature cards */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { icon: BrainCircuit, color: "#3B82F6", bg: "#EFF6FF", label: "ARIMA · RF · LSTM", sub: "Multi-model ensemble" },
+                { icon: ShieldCheck, color: "#8B5CF6", bg: "#F5F3FF", label: "Walk-Forward Valid.", sub: "No data leakage" },
+                { icon: CheckCircle2, color: "#10B981", bg: "#F0FDF4", label: "Smart Reorder", sub: "Safety stock aware" },
+              ].map((f) => {
+                const Icon = f.icon;
+                return (
+                  <div key={f.label} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 flex items-center gap-2 hover:shadow-sm transition-all">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: f.bg }}>
+                      <Icon className="w-3 h-3" style={{ color: f.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-800 leading-tight">{f.label}</p>
+                      <p className="text-[9px] text-slate-400">{f.sub}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
