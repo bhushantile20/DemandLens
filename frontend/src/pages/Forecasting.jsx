@@ -179,9 +179,14 @@ export default function Forecasting() {
         const d = f.forecast_date, val = parseFloat(f.predicted_demand);
         if (!forecastMap[d]) forecastMap[d] = { date: d };
         if (!rows[d]) rows[d] = { date: d };
-        if (f.model_name === 'arima') { forecastMap[d].arima  = val; rows[d].arima  = val; sums.arima  += val; }
-        if (f.model_name === 'random_forest')          { forecastMap[d].rf   = val; rows[d].rf   = val; sums.rf   += val; }
-        if (f.model_name === 'lstm')                   { forecastMap[d].lstm = val; rows[d].lstm = val; sums.lstm += val; }
+        if (f.model_name === 'arima') {
+          forecastMap[d].arima     = val;
+          forecastMap[d].conf_low  = parseFloat((val * 0.85).toFixed(2));
+          forecastMap[d].conf_band = parseFloat((val * 0.30).toFixed(2)); // band = high - low = 30% of val
+          rows[d].arima = val; sums.arima += val;
+        }
+        if (f.model_name === 'random_forest') { forecastMap[d].rf   = val; rows[d].rf   = val; sums.rf   += val; }
+        if (f.model_name === 'lstm')          { forecastMap[d].lstm = val; rows[d].lstm = val; sums.lstm += val; }
       });
       const histArr     = Object.values(histMap).sort((a, b) => a.date.localeCompare(b.date));
       const forecastArr = Object.values(forecastMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -396,6 +401,11 @@ export default function Forecasting() {
                     <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01} />
                   </linearGradient>
+                  {/* Module 6: confidence band gradient */}
+                  <linearGradient id="gradConf" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stopColor="#3b82f6" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.04} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => fmtDate(t)} interval="preserveStartEnd" />
@@ -439,6 +449,21 @@ export default function Forecasting() {
                     label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
                 )}
                 <Area type="monotone" dataKey="actual" name="Actual Consumption" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" dot={false} connectNulls activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
+
+                {/* ── Module 6: Confidence Band (±15%) ── */}
+                <Area
+                  type="monotone" dataKey="conf_low" stackId="conf" name="Conf. Low"
+                  stroke="none" fill="transparent" legendType="none"
+                  connectNulls dot={false} activeDot={false}
+                />
+                <Area
+                  type="monotone" dataKey="conf_band" stackId="conf" name="±15% Confidence Band"
+                  stroke="#3b82f6" strokeWidth={0.8} strokeDasharray="3 2" strokeOpacity={0.4}
+                  fill="url(#gradConf)"
+                  connectNulls dot={false} activeDot={false}
+                  legendType="rect"
+                />
+
                 <Line type="monotone" dataKey="arima"  name="ARIMA (Statistical)"    stroke="#3b82f6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="rf"   name="Random Forest (ML)"   stroke="#8b5cf6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
                 <Line type="monotone" dataKey="lstm" name="LSTM (Deep Learning)" stroke="#10b981" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
