@@ -65,6 +65,25 @@ export default function ItemsList() {
     overstock: items.filter(i => i.risk_status === "overstock").length,
   }), [items]);
 
+  // ── helper: extract the sortable value for a given key ──────────────────────
+  const getSortVal = (item, key) => {
+    if (key === 'supplier')          return item.supplier?.supplier_name?.toLowerCase() ?? '';
+    if (key === 'stock_ratio') {
+      const qty    = parseFloat(item.stock?.quantity_available ?? 0);
+      const reorder = parseFloat(item.stock?.reorder_level ?? 1);
+      return reorder > 0 ? qty / reorder : 0;
+    }
+    if (key === 'days_of_stock_left') {
+      const qty   = parseFloat(item.stock?.quantity_available ?? 0);
+      const pred  = parseFloat(item.forecast_next_7d ?? 0);
+      const daily = pred / 7;
+      return daily > 0 ? qty / daily : 9999;
+    }
+    if (key === 'forecast_next_7d') return parseFloat(item.forecast_next_7d ?? 0);
+    const v = item[key] ?? '';
+    return typeof v === 'string' ? v.toLowerCase() : v;
+  };
+
   // Filter + search + sort
   const displayed = useMemo(() => {
     let list = items;
@@ -75,17 +94,17 @@ export default function ItemsList() {
 
     const { key, dir } = sortCfg;
     list = [...list].sort((a, b) => {
-      let va = a[key] ?? "", vb = b[key] ?? "";
-      if (typeof va === "string") va = va.toLowerCase(), vb = vb.toLowerCase();
-      if (va < vb) return dir === "asc" ? -1 : 1;
-      if (va > vb) return dir === "asc" ? 1  : -1;
+      const va = getSortVal(a, key);
+      const vb = getSortVal(b, key);
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ? 1  : -1;
       return 0;
     });
     return list;
   }, [items, search, filters, sortCfg]);
 
   const toggleSort = (key) => setSortCfg(prev =>
-    prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
   );
 
   const SortTh = ({ col, label, right }) => {

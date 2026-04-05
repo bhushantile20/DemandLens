@@ -70,9 +70,16 @@ def generate_reorder_recommendations(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
 
-        # suggested reorder qty: how much to order to cover demand + safety buffer
-        # = forecasted demand + safety_buffer - current_stock (if negative, no reorder needed)
-        suggested = total_pred + safety_buffer - current_stock
+        # ── suggested_reorder_qty ─────────────────────────────────────────
+        # How much to order so that after receiving stock we have enough
+        # to cover demand over lead time + sit above safety threshold.
+        #
+        #  target = reorder_level + safety_buffer
+        #  need   = target - projected_stock   (how far below target we are/will be)
+        #
+        # For "safe" items the calculation naturally yields ≤ 0 → 0.
+        target_stock = reorder_level + safety_buffer
+        suggested = target_stock - projected_stock
         if suggested < 0:
             suggested = Decimal("0")
         suggested = suggested.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, ReferenceArea,
 } from 'recharts';
 
-import { Activity, RefreshCw, TrendingUp, Cpu, Zap, ChevronDown, Gauge, AlertCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Activity, RefreshCw, TrendingUp, Cpu, Zap, ChevronDown, Gauge, AlertCircle, AlertTriangle, ArrowRight, Download } from 'lucide-react';
 import { getItems, getItemForecast, runForecast, getTurnoverRate } from '../services/api';
 
 // ─── Speed badge config ───────────────────────────────────────────────────────
@@ -142,6 +142,46 @@ export default function Forecasting() {
   const [accuracy, setAccuracy]         = useState({ arima: null, random_forest: null, lstm: null });
   const [lastGenerated, setLastGenerated] = useState(null);
   const [anomalyDates, setAnomalyDates]   = useState({});  // date -> {type, z_score}
+  const [hiddenSeries, setHiddenSeries]   = useState(new Set()); // Module 8
+
+  const toggleSeries = (key) => {
+    setHiddenSeries(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  // ── Module 9: Export CSV ──
+  const exportCSV = () => {
+    if (!chartData.length || !selectedItem) return;
+    const headers = ['Date', 'Type', 'Actual (units)', 'ARIMA Forecast', 'RF Forecast', 'LSTM Forecast', 'Anomaly', 'Anomaly Type'];
+    const rows = chartData.map(row => {
+      const isHistory  = row.actual != null;
+      const isForecast = row.arima != null || row.rf != null || row.lstm != null;
+      const anomaly    = anomalyDates[row.date];
+      return [
+        row.date,
+        isHistory ? 'History' : 'Forecast',
+        row.actual  != null ? row.actual.toFixed(2)  : '',
+        row.arima   != null ? row.arima.toFixed(2)   : '',
+        row.rf      != null ? row.rf.toFixed(2)      : '',
+        row.lstm    != null ? row.lstm.toFixed(2)    : '',
+        anomaly ? 'Yes' : 'No',
+        anomaly ? anomaly.type : '',
+      ];
+    });
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `DemandLens_${selectedItem.item_name.replace(/\s+/g, '_')}_${historyDays}d_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -417,7 +457,29 @@ export default function Forecasting() {
             </div>
           </div>
 
-          {/* Chart */}
+          {/* ── Module 9: Export CSV button ── */}
+          {chartData.length > 0 && selectedItem && (
+            <div style={{ padding: '0 20px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                id="export-csv-btn"
+                onClick={exportCSV}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 9,
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#475569', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+              >
+                <Download style={{ width: 13, height: 13 }} />
+                Export CSV
+              </button>
+            </div>
+          )}
           {loading ? (
             <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
               <RefreshCw style={{ width: 26, height: 26, color: '#3b82f6', animation: 'spin 0.8s linear infinite' }} />
@@ -446,7 +508,60 @@ export default function Forecasting() {
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => fmtDate(t)} interval="preserveStartEnd" />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} width={34} />
                 <Tooltip content={<ForecastTooltip />} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: '#64748b', paddingTop: 14 }} />
+
+                {/* ── Module 8: Custom Clickable Legend ── */}
+                <Legend
+                  wrapperStyle={{ paddingTop: 14 }}
+                  content={() => {
+                    const series = [
+                      { key: 'actual', name: 'Actual Consumption', color: '#3b82f6', shape: 'area' },
+                      { key: 'arima',  name: 'ARIMA (Statistical)',    color: '#3b82f6', shape: 'dashed' },
+                      { key: 'rf',     name: 'Random Forest (ML)',  color: '#8b5cf6', shape: 'dashed' },
+                      { key: 'lstm',   name: 'LSTM (Deep Learning)',color: '#10b981', shape: 'dashed' },
+                      { key: 'conf_band', name: '±15% Conf. Band',  color: '#3b82f6', shape: 'band' },
+                    ];
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6 }}>
+                        {series.map(s => {
+                          const hidden = hiddenSeries.has(s.key);
+                          return (
+                            <button
+                              key={s.key}
+                              onClick={() => toggleSeries(s.key)}
+                              title={hidden ? `Show ${s.name}` : `Hide ${s.name}`}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                padding: '4px 11px', borderRadius: 20,
+                                border: `1px solid ${hidden ? '#e2e8f0' : s.color + '55'}`,
+                                background: hidden ? '#f8fafc' : s.color + '12',
+                                cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                                color: hidden ? '#94a3b8' : s.color,
+                                transition: 'all 0.15s', fontFamily: "'Inter', system-ui",
+                                opacity: hidden ? 0.55 : 1,
+                              }}
+                            >
+                              {/* mini swatch */}
+                              {s.shape === 'area' && (
+                                <span style={{ width: 10, height: 10, borderRadius: 3, background: hidden ? '#cbd5e1' : s.color, display: 'inline-block', flexShrink: 0 }} />
+                              )}
+                              {s.shape === 'dashed' && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <span style={{ width: 8, height: 2, background: hidden ? '#cbd5e1' : s.color, borderRadius: 1 }} />
+                                  <span style={{ width: 3, height: 2, background: hidden ? '#cbd5e1' : s.color, borderRadius: 1 }} />
+                                </span>
+                              )}
+                              {s.shape === 'band' && (
+                                <span style={{ width: 12, height: 8, borderRadius: 2, background: hidden ? '#e2e8f0' : s.color + '33', border: `1px solid ${hidden ? '#e2e8f0' : s.color + '55'}`, display: 'inline-block', flexShrink: 0 }} />
+                              )}
+                              {s.name}
+                              {hidden && <span style={{ fontSize: 9, opacity: 0.7 }}>(hidden)</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  }}
+                />
 
                 {/* ── Module 3: Forecast Zone Shading ── */}
                 {forecastZone.start && forecastZone.end && (
@@ -485,6 +600,7 @@ export default function Forecasting() {
                 )}
                 <Area type="monotone" dataKey="actual" name="Actual Consumption" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" dot={false} connectNulls
                   activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                  hide={hiddenSeries.has('actual')}
                 />
 
                 {/* ── Module 7: Anomaly vertical markers (Tableau/Grafana style) ── */}
@@ -511,6 +627,7 @@ export default function Forecasting() {
                   type="monotone" dataKey="conf_low" stackId="conf" name="Conf. Low"
                   stroke="none" fill="transparent" legendType="none"
                   connectNulls dot={false} activeDot={false}
+                  hide={hiddenSeries.has('conf_band')}
                 />
                 <Area
                   type="monotone" dataKey="conf_band" stackId="conf" name="±15% Confidence Band"
@@ -518,11 +635,12 @@ export default function Forecasting() {
                   fill="url(#gradConf)"
                   connectNulls dot={false} activeDot={false}
                   legendType="rect"
+                  hide={hiddenSeries.has('conf_band')}
                 />
 
-                <Line type="monotone" dataKey="arima"  name="ARIMA (Statistical)"    stroke="#3b82f6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
-                <Line type="monotone" dataKey="rf"   name="Random Forest (ML)"   stroke="#8b5cf6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
-                <Line type="monotone" dataKey="lstm" name="LSTM (Deep Learning)" stroke="#10b981" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
+                <Line type="monotone" dataKey="arima"  name="ARIMA (Statistical)"    stroke="#3b82f6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls hide={hiddenSeries.has('arima')} />
+                <Line type="monotone" dataKey="rf"     name="Random Forest (ML)"     stroke="#8b5cf6" strokeWidth={2} strokeDasharray="7 4" dot={{ r: 4, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls hide={hiddenSeries.has('rf')} />
+                <Line type="monotone" dataKey="lstm"   name="LSTM (Deep Learning)"   stroke="#10b981" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls hide={hiddenSeries.has('lstm')} />
               </ComposedChart>
             </ResponsiveContainer>
           )}

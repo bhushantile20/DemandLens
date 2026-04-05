@@ -380,7 +380,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Active Alerts Feed */}
         <div className="bg-white border border-slate-100 rounded-xl shadow-sm flex flex-col overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-red-500" />
@@ -389,19 +388,47 @@ export default function Dashboard() {
           <div className="flex-1 overflow-y-auto divide-y divide-slate-50 max-h-[250px]">
             {alerts.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-8">✅ All systems operating normally.</p>
-            ) : (
-              alerts.slice(0, 8).map((alert, i) => (
-                <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
-                  <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${alert.suggested_reorder_qty > 0 ? 'bg-red-500' : 'bg-amber-400'}`} />
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{alert.item?.item_name || 'Unknown'}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Reorder <span className="font-bold text-slate-700">{alert.suggested_reorder_qty}</span> units · {alert.alert_level?.toUpperCase()}
-                    </p>
+            ) : (() => {
+              // Parse alert level from explanation field, sort by severity
+              const enriched = alerts.map(a => {
+                const lvl = (a.explanation || '').match(/alert_level=(\w+)/)?.[1] || 'safe';
+                return { ...a, _level: lvl };
+              }).sort((a, b) => {
+                const order = { reorder_now: 0, watch: 1, safe: 2 };
+                return (order[a._level] ?? 2) - (order[b._level] ?? 2);
+              });
+
+              const levelStyle = {
+                reorder_now: { dot: 'bg-red-500',   badge: 'bg-red-50 text-red-700 border-red-200',   label: 'REORDER NOW' },
+                watch:       { dot: 'bg-amber-400', badge: 'bg-amber-50 text-amber-700 border-amber-200', label: 'WATCH' },
+                safe:        { dot: 'bg-emerald-400', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'SAFE' },
+              };
+
+              return enriched.slice(0, 8).map((alert, i) => {
+                const style = levelStyle[alert._level] || levelStyle.safe;
+                const daysLeft = alert.days_of_stock_left ? parseFloat(alert.days_of_stock_left).toFixed(0) : '—';
+                const reorderQty = parseFloat(alert.suggested_reorder_qty || 0);
+                return (
+                  <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
+                    <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-800 truncate">{alert.item_name || 'Unknown'}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${style.badge}`}>
+                          {style.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {reorderQty > 0
+                          ? <>Reorder <span className="font-bold text-slate-700">{reorderQty.toFixed(0)}</span> units · {daysLeft}d stock left</>
+                          : <>Stock OK · <span className="font-bold text-slate-700">{daysLeft}d</span> remaining · Pred. {parseFloat(alert.predicted_demand_7d || 0).toFixed(0)} u/7d</>
+                        }
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                );
+              });
+            })()}
           </div>
         </div>
       </div>
