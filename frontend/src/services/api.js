@@ -24,6 +24,7 @@ export const getAbcRanking             = () => api.get('/analytics/abc-ranking/'
 export const getInventoryHealth        = () => api.get('/analytics/inventory-health/');
 export const getTurnoverRate           = () => api.get('/analytics/turnover-rate/');
 export const getStockValueByCategory   = () => api.get('/analytics/stock-value/');
+export const getMacroTrend             = () => api.get('/analytics/macro-trend/');
 
 // ─── User profile endpoints ───────────────────────────────────────
 export const updateName = (name) =>

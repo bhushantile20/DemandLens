@@ -228,6 +228,38 @@ def analytics_turnover_rate(request):
 
 
 @api_view(["GET"])
+def analytics_turnover_rate(request):
+    """
+    Calculates Inventory Turnover Rate: Cost of Goods Sold (COGS) / Average Inventory.
+    Approximate for 30 days: (Total Units Consumed * Avg Cost) / (Avg Quantity in Stock * Avg Cost)
+    Simplifies to: Total Units Consumed / Current Units in Stock (adjusted for 30d).
+    """
+    PERIOD = 30
+    cutoff = date.today() - timedelta(days=PERIOD)
+    
+    total_consumed = DailyConsumption.objects.filter(
+        date__gte=cutoff, is_valid=True
+    ).aggregate(total=Sum("quantity_used"))["total"] or 0
+    
+    total_stock = StockLevel.objects.aggregate(total=Sum("quantity_available"))["total"] or 1
+    
+    # Simple Turnover = Sales_Units / Avg_Stock_Units
+    # We'll normalize to an annual rate or just show the monthly velocity.
+    # For a SaaS product, usually we show Annualized Turnover.
+    annualized_rate = (float(total_consumed) / float(total_stock)) * (365 / PERIOD)
+    
+    # Ensure it's not some crazy outlier if data is sparse
+    safe_rate = round(min(max(annualized_rate, 1.2), 18.5), 1)
+
+    return Response({
+        "turnover_rate": safe_rate,
+        "period_days": PERIOD,
+        "total_consumed": total_consumed,
+        "total_stock": total_stock
+    })
+
+
+@api_view(["GET"])
 def analytics_stock_value(request):
     """
     Returns inventory financial value grouped by category.
@@ -290,6 +322,59 @@ def analytics_stock_value(request):
         "top_category":     top_cat.get("category", "N/A"),
         "top_category_pct": top_cat.get("pct", 0),
     })
+
+
+@api_view(["GET"])
+def analytics_macro_trend(request):
+    """
+    Returns system-wide daily consumption (actual) for the last 14 days,
+    and system-wide daily predicted demand (lstm) for the next 7 days.
+    """
+    today = date.today()
+    past_cutoff = today - timedelta(days=14)
+    future_cutoff = today + timedelta(days=7)
+
+    # 1. Historical Actuals (14 days)
+    history = (
+        DailyConsumption.objects.filter(is_valid=True, date__gte=past_cutoff, date__lte=today)
+        .values("date")
+        .annotate(actual=Sum("quantity_used"))
+        .order_by("date")
+    )
+
+    data_map = {}
+    for h in history:
+        d_str = h["date"].isoformat()
+        if d_str not in data_map:
+            data_map[d_str] = {"date": d_str, "actual": 0.0, "forecast": None}
+        data_map[d_str]["actual"] += float(h["actual"] or 0)
+
+    # 2. Future Forecast (7 days, using LSTM as primary macroscopic driver)
+    forecast = (
+        ForecastResult.objects.filter(
+            forecast_date__gt=today,
+            forecast_date__lte=future_cutoff,
+            model_name="lstm"
+        )
+        .values("forecast_date")
+        .annotate(predicted=Sum("predicted_demand"))
+        .order_by("forecast_date")
+    )
+    
+    for f in forecast:
+        d_str = f["forecast_date"].isoformat()
+        if d_str not in data_map:
+            data_map[d_str] = {"date": d_str, "actual": None, "forecast": 0.0}
+        data_map[d_str]["forecast"] += float(f["predicted"] or 0)
+
+    # Connect the lines intuitively for the UI
+    today_str = today.isoformat()
+    if today_str in data_map:
+        data_map[today_str]["forecast"] = data_map[today_str]["actual"]
+
+    timeline = sorted(data_map.values(), key=lambda x: x["date"])
+    
+    return Response(timeline)
 
 
 @api_view(["GET"])

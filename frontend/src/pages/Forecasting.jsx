@@ -518,7 +518,7 @@ export default function Forecasting() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={t => fmtDate(t)} interval="preserveStartEnd" />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} width={34} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} domain={[0, 'auto']} tickCount={7} width={38} />
                 <Tooltip content={<ForecastTooltip />} />
 
                 {/* ── Module 8: Custom Clickable Legend ── */}
