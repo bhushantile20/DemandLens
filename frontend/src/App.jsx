@@ -6,6 +6,7 @@ import Navbar     from "./components/Navbar";
 
 import Home        from "./pages/Home";
 import Login       from "./pages/Login";
+import Register    from "./pages/Register";
 import Dashboard   from "./pages/Dashboard";
 import ItemsList   from "./pages/ItemsList";
 import ItemDetail  from "./pages/ItemDetail";
@@ -41,8 +42,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* ── Full-page public routes (NO sidebar, NO navbar) ── */}
-        <Route path="/"      element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/"         element={<Home />} />
+        <Route path="/login"    element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         {/* ── App routes — each explicitly wrapped in AppShell ── */}
         <Route path="/dashboard"     element={<AppShell><Dashboard /></AppShell>} />

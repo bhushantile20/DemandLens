@@ -54,11 +54,7 @@ export default function Home() {
           </span>
         </div>
 
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium" style={{ color: "#64748B" }}>
-          <a href="#" className="hover:text-white transition-colors">Features</a>
-          <a href="#" className="hover:text-white transition-colors">Architecture</a>
-          <a href="#" className="hover:text-white transition-colors">Demo</a>
-        </div>
+
 
         <button
           onClick={() => navigate("/login")}
