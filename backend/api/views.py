@@ -413,7 +413,58 @@ def item_forecast(request, pk):
     ).order_by("forecast_date")
     forecast = ForecastResultSerializer(forecast_qs, many=True).data
 
-    return Response({"history": history, "forecast": forecast})
+    # ── Module 4: Compute MAPE accuracy for each model ──────────────────────
+    # Strategy: compare each model's 7-day forecast avg/day vs actual avg/day
+    # from the last 7 days of real consumption. This is valid because MAPE
+    # measures how far predictions are from reality in percentage terms.
+    recent_start = today - timedelta(days=7)
+    recent_actual_qs = (
+        DailyConsumption.objects.filter(
+            item=item, is_valid=True,
+            date__gte=recent_start, date__lt=today
+        )
+        .values("date")
+        .annotate(total=Sum("quantity_used"))
+    )
+    actual_by_day = [float(r["total"]) for r in recent_actual_qs if float(r["total"]) > 0]
+    avg_actual = sum(actual_by_day) / len(actual_by_day) if actual_by_day else None
+
+    # Future forecasts: avg daily demand per model
+    future_forecast_qs = ForecastResult.objects.filter(
+        item=item, forecast_date__gt=today, forecast_date__lte=horizon_end
+    )
+
+    model_totals = {"arima": [], "random_forest": [], "lstm": []}
+    for fr in future_forecast_qs:
+        if fr.model_name in model_totals:
+            model_totals[fr.model_name].append(float(fr.predicted_demand))
+
+    def _mape_vs_actual(predicted_vals, actual_avg):
+        """MAPE: mean of |actual - pred| / actual × 100 across all forecast days"""
+        if not predicted_vals or actual_avg is None or actual_avg == 0:
+            return None
+        return round(
+            sum(abs(actual_avg - p) / actual_avg * 100 for p in predicted_vals) / len(predicted_vals),
+            1
+        )
+
+    accuracy = {
+        "arima":         _mape_vs_actual(model_totals["arima"], avg_actual),
+        "random_forest": _mape_vs_actual(model_totals["random_forest"], avg_actual),
+        "lstm":          _mape_vs_actual(model_totals["lstm"], avg_actual),
+    }
+    # ────────────────────────────────────────────────────────────────────────
+
+    # Module 10: Last updated timestamp
+    latest = ForecastResult.objects.filter(item=item).order_by("-generated_at").first()
+    last_generated = latest.generated_at.isoformat() if latest else None
+
+    return Response({
+        "history": history,
+        "forecast": forecast,
+        "accuracy": accuracy,
+        "last_generated": last_generated,
+    })
 
 
 @api_view(["GET"])

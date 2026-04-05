@@ -65,22 +65,52 @@ const TurnoverTooltip = ({ active, payload }) => {
 };
 
 // ─── Model Stat Card ─────────────────────────────────────────────────────────
-const ModelCard = ({ label, sublabel, icon: Icon, value, color, bg, border }) => (
+const ModelCard = ({ label, sublabel, icon: Icon, value, color, bg, border, mape, isRecommended }) => (
   <div style={{
-    background: '#fff', border: `1px solid ${border}`, borderRadius: 14,
+    background: '#fff',
+    border: `1px solid ${border}`,
+    borderRadius: 14,
     padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16,
     boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
   }}>
     <div style={{ width: 48, height: 48, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <Icon style={{ width: 22, height: 22, color }} />
     </div>
-    <div>
-      <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+    <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 0 }}>
+        <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+        {isRecommended && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: '#16a34a',
+            background: '#f0fdf4', border: '1px solid #bbf7d0',
+            borderRadius: 5, padding: '1px 6px', letterSpacing: '0.03em',
+            textTransform: 'uppercase',
+          }}>&#x2713; Recommended</span>
+        )}
+      </div>
       <p style={{ fontSize: 11, color: '#cbd5e1', margin: '2px 0 5px' }}>{sublabel}</p>
       <p style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1 }}>
         {Number(value).toFixed(0)}
         <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8', marginLeft: 5 }}>units / 7d</span>
       </p>
+    </div>
+    {/* MAPE accuracy badge */}
+    <div style={{
+      textAlign: 'center', flexShrink: 0,
+      padding: '8px 12px',
+      background: mape == null ? '#f8fafc' : mape < 10 ? '#f0fdf4' : mape < 20 ? '#fffbeb' : '#fef2f2',
+      border: `1px solid ${mape == null ? '#e2e8f0' : mape < 10 ? '#bbf7d0' : mape < 20 ? '#fde68a' : '#fca5a5'}`,
+      borderRadius: 10,
+      minWidth: 64,
+    }}>
+      <p style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Error</p>
+      <p style={{
+        fontSize: 16, fontWeight: 800, margin: 0,
+        color: mape == null ? '#cbd5e1' : mape < 10 ? '#16a34a' : mape < 20 ? '#b45309' : '#dc2626',
+      }}>
+        {mape != null ? `${mape}%` : '—'}
+      </p>
+      <p style={{ fontSize: 9, color: '#94a3b8', margin: '2px 0 0' }}>MAPE</p>
     </div>
   </div>
 );
@@ -100,6 +130,8 @@ export default function Forecasting() {
   const [turnoverLoading, setTurnoverLoading] = useState(true);
   const [historyDays, setHistoryDays]   = useState(30);
   const [forecastZone, setForecastZone] = useState({ start: null, end: null });
+  const [accuracy, setAccuracy]         = useState({ arima: null, random_forest: null, lstm: null });
+  const [lastGenerated, setLastGenerated] = useState(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -162,6 +194,10 @@ export default function Forecasting() {
       } else {
         setForecastZone({ start: null, end: null });
       }
+      // Module 4: accuracy from backend
+      if (res.data.accuracy) setAccuracy(res.data.accuracy);
+      // Module 10: last generated timestamp
+      if (res.data.last_generated) setLastGenerated(res.data.last_generated);
       setChartData([...histArr, ...forecastArr]);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -222,6 +258,16 @@ export default function Forecasting() {
     }
   }
 
+  // ── Module 5: Best Model Badge ──
+  const mapeEntries = [
+    { key: 'arima', val: accuracy.arima },
+    { key: 'random_forest', val: accuracy.random_forest },
+    { key: 'lstm', val: accuracy.lstm },
+  ].filter(e => e.val != null);
+  const bestModel = mapeEntries.length > 0
+    ? mapeEntries.reduce((a, b) => a.val <= b.val ? a : b).key
+    : null;
+
   // ───────────────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: 24, background: '#f8fafc', minHeight: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -238,6 +284,19 @@ export default function Forecasting() {
           <p style={{ fontSize: 13, color: '#64748b', margin: 0, paddingLeft: 46 }}>
             AI-powered predictions · 30-day history + 7-day outlook · Item turnover intelligence
           </p>
+          {lastGenerated && (
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0', paddingLeft: 46, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+              Forecasts last generated:&nbsp;
+              <strong style={{ color: '#64748b', fontWeight: 600 }}>
+                {new Date(lastGenerated).toLocaleString('en-IN', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit', hour12: true,
+                  timeZone: 'Asia/Kolkata',
+                })}
+              </strong>
+            </p>
+          )}
         </div>
         <button
           id="run-forecast-btn"
@@ -261,9 +320,9 @@ export default function Forecasting() {
 
       {/* ══ ROW 1: Model Summary Cards ══ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" />
-        <ModelCard label="Random Forest · ML"   sublabel="Ensemble Decision Trees" icon={Cpu}      value={modelSums.rf}   color="#8b5cf6" bg="#f5f3ff" border="#ddd6fe" />
-        <ModelCard label="LSTM · Deep Learning" sublabel="Neural Network Model"    icon={Zap}      value={modelSums.lstm} color="#10b981" bg="#f0fdf4" border="#bbf7d0" />
+        <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" mape={accuracy.arima}         isRecommended={bestModel === 'arima'} />
+        <ModelCard label="Random Forest · ML"   sublabel="Ensemble Decision Trees" icon={Cpu}      value={modelSums.rf}   color="#8b5cf6" bg="#f5f3ff" border="#ddd6fe" mape={accuracy.random_forest}  isRecommended={bestModel === 'random_forest'} />
+        <ModelCard label="LSTM · Deep Learning" sublabel="Neural Network Model"    icon={Zap}      value={modelSums.lstm} color="#10b981" bg="#f0fdf4" border="#bbf7d0" mape={accuracy.lstm}         isRecommended={bestModel === 'lstm'} />
       </div>
 
       {/* ══ ROW 2: Forecast Chart (2/3) + 7-Day Table (1/3) ══ */}
