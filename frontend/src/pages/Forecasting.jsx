@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ComposedChart, Area, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, ReferenceLine, Legend,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, ReferenceArea,
 } from 'recharts';
 
-import { Activity, RefreshCw, TrendingUp, Cpu, Zap, ChevronDown, Gauge } from 'lucide-react';
+import { Activity, RefreshCw, TrendingUp, Cpu, Zap, ChevronDown, Gauge, AlertCircle, AlertTriangle, ArrowRight } from 'lucide-react';
 import { getItems, getItemForecast, runForecast, getTurnoverRate } from '../services/api';
 
 // ─── Speed badge config ───────────────────────────────────────────────────────
@@ -98,8 +98,11 @@ export default function Forecasting() {
   const [itemsLoading, setItemsLoading] = useState(true);
   const [turnoverData, setTurnoverData]       = useState(null);
   const [turnoverLoading, setTurnoverLoading] = useState(true);
+  const [historyDays, setHistoryDays]   = useState(30);
+  const [forecastZone, setForecastZone] = useState({ start: null, end: null });
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setItemsLoading(true);
@@ -114,7 +117,7 @@ export default function Forecasting() {
           const target = targetId
             ? (res.data.find(i => i.id === targetId) || res.data[0])
             : res.data[0];
-          loadForecast(target);
+          loadForecast(target, 30);
         }
       })
       .catch(console.error)
@@ -127,11 +130,11 @@ export default function Forecasting() {
   }, [location.search]);
 
 
-  const loadForecast = async (item) => {
+  const loadForecast = async (item, days = historyDays) => {
     setSelectedItem(item);
     setLoading(true);
     try {
-      const res = await getItemForecast(item.id, 30);
+      const res = await getItemForecast(item.id, days);
       const histMap = {};
       res.data.history.forEach(h => {
         if (!histMap[h.date]) histMap[h.date] = { date: h.date, actual: 0 };
@@ -153,6 +156,12 @@ export default function Forecasting() {
       setModelSums(sums);
       setForecastRows(Object.values(rows).sort((a, b) => a.date.localeCompare(b.date)));
       setTodayMarker(histArr.length > 0 ? histArr[histArr.length - 1].date : null);
+      // capture forecast zone boundaries for Module 3
+      if (forecastArr.length > 0) {
+        setForecastZone({ start: forecastArr[0].date, end: forecastArr[forecastArr.length - 1].date });
+      } else {
+        setForecastZone({ start: null, end: null });
+      }
       setChartData([...histArr, ...forecastArr]);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -162,7 +171,7 @@ export default function Forecasting() {
     setRunning(true);
     try {
       await runForecast();
-      if (selectedItem) await loadForecast(selectedItem);
+      if (selectedItem) await loadForecast(selectedItem, historyDays);
       const tr = await getTurnoverRate();
       setTurnoverData(tr.data);
     } catch (err) { console.error(err); }
@@ -176,6 +185,42 @@ export default function Forecasting() {
 
   const totalItems = turnoverData?.buckets?.reduce((s, b) => s + b.value, 0) || 1;
   const activeBuckets = turnoverData?.buckets?.filter(b => b.value > 0) || [];
+
+  // ── Calculate Banner Logic ──
+  const avgModels = [modelSums.arima, modelSums.rf, modelSums.lstm].filter(v => v > 0);
+  const avgForecast7d = avgModels.length > 0 ? (avgModels.reduce((a, b) => a + b, 0) / avgModels.length) : 0;
+  const currentStock = selectedItem?.stock?.quantity_available ? parseFloat(selectedItem.stock.quantity_available) : 0;
+  
+  const deficit = avgForecast7d - currentStock;
+  const remainingStock = currentStock - avgForecast7d;
+  
+  let banner = null;
+  if (selectedItem) {
+    const isCritical = deficit > 0 || selectedItem.risk_status === 'critical';
+    const isWarning  = (remainingStock > 0 && remainingStock < (currentStock * 0.2)) || selectedItem.risk_status === 'low';
+
+    if (isCritical) {
+      banner = {
+        type: 'danger',
+        icon: <AlertCircle style={{ width: 22, height: 22, color: '#dc2626' }} />,
+        title: `Stock Runout Warning`,
+        text: deficit > 0 
+          ? `${selectedItem.item_name} will run out soon at the forecasted demand rate.`
+          : `${selectedItem.item_name} has fallen below its critical reorder trigger point.`,
+        colors: { bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', iconBg: '#fee2e2' },
+        details: `Current Stock: ${currentStock.toFixed(0)} units  ·  7-Day AI Demand: ${avgForecast7d.toFixed(0)} units  ·  Deficit: ${(deficit > 0 ? -deficit : remainingStock).toFixed(0)} units`
+      };
+    } else if (isWarning) {
+      banner = {
+        type: 'warning',
+        icon: <AlertTriangle style={{ width: 22, height: 22, color: '#b45309' }} />,
+        title: `Low Stock Warning`,
+        text: `${selectedItem.item_name} inventory is getting uncomfortably low based on AI projections.`,
+        colors: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', iconBg: '#fef3c7' },
+        details: `Current Stock: ${currentStock.toFixed(0)} units  ·  7-Day AI Demand: ${avgForecast7d.toFixed(0)} units  ·  Remaining: ${remainingStock.toFixed(0)} units`
+      };
+    }
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   return (
@@ -212,6 +257,8 @@ export default function Forecasting() {
         </button>
       </div>
 
+
+
       {/* ══ ROW 1: Model Summary Cards ══ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
         <ModelCard label="ARIMA · Statistical"    sublabel="Autoregressive Model"   icon={Activity} value={modelSums.arima}  color="#3b82f6" bg="#eff6ff" border="#bfdbfe" />
@@ -229,18 +276,45 @@ export default function Forecasting() {
               <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>Historical Consumption + AI Forecast</h2>
               <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>Shaded area = actual · Dashed lines = 3 AI model projections</p>
             </div>
-            {/* Item selector */}
-            <div style={{ position: 'relative' }}>
-              <select
-                id="item-forecast-selector"
-                value={selectedItem?.id || ''}
-                disabled={itemsLoading}
-                onChange={e => { const item = items.find(i => i.id === parseInt(e.target.value)); if (item) loadForecast(item); }}
-                style={{ appearance: 'none', WebkitAppearance: 'none', fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#374151', borderRadius: 9, padding: '9px 34px 9px 14px', outline: 'none', fontFamily: "'Inter',system-ui", fontWeight: 500, cursor: 'pointer', minWidth: 190 }}
-              >
-                {items.map(it => <option key={it.id} value={it.id}>{it.item_name}</option>)}
-              </select>
-              <ChevronDown style={{ width: 13, height: 13, color: '#94a3b8', position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {/* ── History Window Pills ── */}
+              <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 10, padding: 3, gap: 2 }}>
+                {[7, 30, 90].map(d => (
+                  <button
+                    key={d}
+                    id={`history-${d}d`}
+                    onClick={() => { setHistoryDays(d); if (selectedItem) loadForecast(selectedItem, d); }}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontFamily: "'Inter', system-ui",
+                      transition: 'all 0.18s',
+                      background: historyDays === d ? '#fff' : 'transparent',
+                      color: historyDays === d ? '#3b82f6' : '#94a3b8',
+                      boxShadow: historyDays === d ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+                    }}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              {/* Item selector */}
+              <div style={{ position: 'relative' }}>
+                <select
+                  id="item-forecast-selector"
+                  value={selectedItem?.id || ''}
+                  disabled={itemsLoading}
+                  onChange={e => { const item = items.find(i => i.id === parseInt(e.target.value)); if (item) loadForecast(item, historyDays); }}
+                  style={{ appearance: 'none', WebkitAppearance: 'none', fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#374151', borderRadius: 9, padding: '9px 34px 9px 14px', outline: 'none', fontFamily: "'Inter',system-ui", fontWeight: 500, cursor: 'pointer', minWidth: 190 }}
+                >
+                  {items.map(it => <option key={it.id} value={it.id}>{it.item_name}</option>)}
+                </select>
+                <ChevronDown style={{ width: 13, height: 13, color: '#94a3b8', position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              </div>
             </div>
           </div>
 
@@ -269,6 +343,38 @@ export default function Forecasting() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} width={34} />
                 <Tooltip content={<ForecastTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: '#64748b', paddingTop: 14 }} />
+
+                {/* ── Module 3: Forecast Zone Shading ── */}
+                {forecastZone.start && forecastZone.end && (
+                  <ReferenceArea
+                    x1={forecastZone.start}
+                    x2={forecastZone.end}
+                    fill="#8b5cf6"
+                    fillOpacity={0.06}
+                    stroke="#8b5cf6"
+                    strokeOpacity={0.2}
+                    strokeWidth={1}
+                    label={{ value: 'AI Forecast Zone', position: 'insideTopLeft', fill: '#8b5cf6', fontSize: 10, fontWeight: 600 }}
+                  />
+                )}
+
+                {/* ── Module 3: Reorder Level Line ── */}
+                {selectedItem?.stock?.reorder_level != null && (
+                  <ReferenceLine
+                    y={parseFloat(selectedItem.stock.reorder_level)}
+                    stroke="#ef4444"
+                    strokeDasharray="6 3"
+                    strokeWidth={1.5}
+                    label={{
+                      value: `Reorder Lvl: ${parseFloat(selectedItem.stock.reorder_level).toFixed(0)}`,
+                      position: 'insideTopRight',
+                      fill: '#ef4444',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  />
+                )}
+
                 {todayMarker && (
                   <ReferenceLine x={todayMarker} stroke="#94a3b8" strokeDasharray="5 3" strokeWidth={1.2}
                     label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
@@ -471,6 +577,32 @@ export default function Forecasting() {
           )}
         </div>
       </div>
+
+      {/* ── Runout Warning Banner ── */}
+      {banner && (
+        <div style={{ background: banner.colors.bg, border: `1px solid ${banner.colors.border}`, borderRadius: 12, padding: 18, marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ padding: 8, background: banner.colors.iconBg, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {banner.icon}
+            </div>
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: banner.colors.text }}>{banner.title}</h3>
+              <p style={{ margin: '0 0 6px', fontSize: 14, color: banner.colors.text, opacity: 0.9 }}>{banner.text}</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: banner.colors.text, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
+                {banner.details}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/alerts')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1px solid ${banner.colors.border}`, color: banner.colors.text, borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+          >
+            View Reorder Alerts <ArrowRight style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
+      )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
