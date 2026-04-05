@@ -21,19 +21,28 @@ const SPEED_STYLE = {
 const ForecastTooltip = ({ active, payload, label }) => {
   if (!active || !payload || !payload.length) return null;
   const isForecastZone = payload.every(p => p.dataKey !== 'actual' || p.value == null);
+  const actualPayload  = payload.find(p => p.dataKey === 'actual');
+  const isAnomaly      = actualPayload?.payload?.anomaly;
   return (
     <div style={{
-      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+      background: '#fff',
+      border: `1px solid ${isAnomaly ? '#fca5a5' : '#e2e8f0'}`,
+      borderRadius: 12,
       padding: '12px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       minWidth: 190, fontFamily: "'Inter', system-ui",
     }}>
       <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 6px', fontSize: 12 }}>{label}</p>
-      {isForecastZone && (
+      {isAnomaly && (
+        <p style={{ fontSize: 10, color: '#dc2626', margin: '0 0 6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {actualPayload.payload.anomalyType === 'spike' ? '⚠️ Demand Spike Detected' : '⚠️ Demand Dip Detected'}
+        </p>
+      )}
+      {isForecastZone && !isAnomaly && (
         <p style={{ fontSize: 10, color: '#6366f1', margin: '0 0 8px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.06em' }}>
           ⚡ AI Forecast Zone
         </p>
       )}
-      {payload.map((p, i) => p.value != null && (
+      {payload.map((p, i) => p.value != null && p.name !== 'Conf. Low' && (
         <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, marginTop: 5 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
@@ -132,6 +141,7 @@ export default function Forecasting() {
   const [forecastZone, setForecastZone] = useState({ start: null, end: null });
   const [accuracy, setAccuracy]         = useState({ arima: null, random_forest: null, lstm: null });
   const [lastGenerated, setLastGenerated] = useState(null);
+  const [anomalyDates, setAnomalyDates]   = useState({});  // date -> {type, z_score}
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -193,15 +203,27 @@ export default function Forecasting() {
       setModelSums(sums);
       setForecastRows(Object.values(rows).sort((a, b) => a.date.localeCompare(b.date)));
       setTodayMarker(histArr.length > 0 ? histArr[histArr.length - 1].date : null);
-      // capture forecast zone boundaries for Module 3
+      // Module 3: forecast zone
       if (forecastArr.length > 0) {
         setForecastZone({ start: forecastArr[0].date, end: forecastArr[forecastArr.length - 1].date });
       } else {
         setForecastZone({ start: null, end: null });
       }
-      // Module 4: accuracy from backend
+      // Module 4: accuracy
       if (res.data.accuracy) setAccuracy(res.data.accuracy);
-      // Module 10: last generated timestamp
+      // Module 7: anomaly dates map
+      const aMap = {};
+      (res.data.anomalies || []).forEach(a => { aMap[a.date] = a; });
+      setAnomalyDates(aMap);
+      // mark anomaly flags on histArr data points for custom dot renderer
+      histArr.forEach(pt => {
+        if (aMap[pt.date]) {
+          pt.anomaly     = true;
+          pt.anomalyType = aMap[pt.date].type;
+          pt.zScore      = aMap[pt.date].z_score;
+        }
+      });
+      // Module 10: timestamp
       if (res.data.last_generated) setLastGenerated(res.data.last_generated);
       setChartData([...histArr, ...forecastArr]);
     } catch (err) { console.error(err); }
@@ -341,6 +363,19 @@ export default function Forecasting() {
               <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>Shaded area = actual · Dashed lines = 3 AI model projections</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {/* ── Anomaly count chip ── */}
+              {Object.keys(anomalyDates).length > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  background: '#fef2f2', border: '1px solid #fca5a5',
+                  borderRadius: 8, padding: '4px 10px',
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626' }}>
+                    {Object.keys(anomalyDates).length} Anomal{Object.keys(anomalyDates).length === 1 ? 'y' : 'ies'} Detected
+                  </span>
+                </div>
+              )}
               {/* ── History Window Pills ── */}
               <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 10, padding: 3, gap: 2 }}>
                 {[7, 30, 90].map(d => (
@@ -448,7 +483,28 @@ export default function Forecasting() {
                   <ReferenceLine x={todayMarker} stroke="#94a3b8" strokeDasharray="5 3" strokeWidth={1.2}
                     label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }} />
                 )}
-                <Area type="monotone" dataKey="actual" name="Actual Consumption" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" dot={false} connectNulls activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
+                <Area type="monotone" dataKey="actual" name="Actual Consumption" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" dot={false} connectNulls
+                  activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                />
+
+                {/* ── Module 7: Anomaly vertical markers (Tableau/Grafana style) ── */}
+                {Object.values(anomalyDates).map(a => (
+                  <ReferenceLine
+                    key={a.date}
+                    x={a.date}
+                    stroke={a.type === 'spike' ? '#ef4444' : '#f59e0b'}
+                    strokeWidth={1.5}
+                    strokeOpacity={0.55}
+                    strokeDasharray="4 3"
+                    label={{
+                      value: a.type === 'spike' ? '↑' : '↓',
+                      position: a.type === 'spike' ? 'insideTopLeft' : 'insideBottomLeft',
+                      fill: a.type === 'spike' ? '#ef4444' : '#f59e0b',
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  />
+                ))}
 
                 {/* ── Module 6: Confidence Band (±15%) ── */}
                 <Area

@@ -459,11 +459,41 @@ def item_forecast(request, pk):
     latest = ForecastResult.objects.filter(item=item).order_by("-generated_at").first()
     last_generated = latest.generated_at.isoformat() if latest else None
 
+    # ── Module 7: Anomaly Detection (Z-score ±2σ) ────────────────────────────
+    # Aggregate history by date first
+    agg_qs = (
+        DailyConsumption.objects.filter(item=item, is_valid=True, date__gte=cutoff)
+        .values("date")
+        .annotate(total=Sum("quantity_used"))
+        .order_by("date")
+    )
+    daily_values = [(r["date"], float(r["total"])) for r in agg_qs]
+
+    anomalies = []
+    if len(daily_values) >= 3:
+        vals = [v for _, v in daily_values]
+        mean = sum(vals) / len(vals)
+        variance = sum((v - mean) ** 2 for v in vals) / len(vals)
+        std = variance ** 0.5
+
+        if std > 0:
+            for d, v in daily_values:
+                z = (v - mean) / std
+                if abs(z) > 2:
+                    anomalies.append({
+                        "date":  d.isoformat(),
+                        "value": round(v, 2),
+                        "type":  "spike" if z > 0 else "dip",
+                        "z_score": round(z, 2),
+                    })
+    # ────────────────────────────────────────────────────────────────────────
+
     return Response({
         "history": history,
         "forecast": forecast,
         "accuracy": accuracy,
         "last_generated": last_generated,
+        "anomalies": anomalies,
     })
 
 
