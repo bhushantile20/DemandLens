@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, ReferenceLine, Legend,
+  ResponsiveContainer, CartesianGrid, ReferenceLine, Legend, ReferenceArea,
 } from "recharts";
 import { ArrowLeft, TrendingUp, Package, AlertTriangle, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -67,7 +67,7 @@ export default function ItemDetail() {
   }, [id]);
 
   // ── Build chart data ──────────────────────────────────────────────────────
-  const { chartData, todayMarker, forecastRows, modelSums } = (() => {
+  const { chartData, todayMarker, forecastRows, modelSums, forecastZone } = (() => {
     // Aggregate history by date
     const histMap = {};
     (forecast.history || []).forEach(h => {
@@ -97,6 +97,9 @@ export default function ItemDetail() {
       todayMarker:  histArr.length > 0 ? histArr[histArr.length - 1].date : null,
       forecastRows: rows,
       modelSums:    sums,
+      forecastZone: forecastArr.length > 0
+        ? { start: forecastArr[0].date, end: forecastArr[forecastArr.length - 1].date }
+        : { start: null, end: null },
     };
   })();
 
@@ -244,6 +247,20 @@ export default function ItemDetail() {
               />
               <Tooltip content={<ChartTooltip />} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: "#64748b", paddingTop: 16 }} />
+
+              {/* ── Forecast Zone Shading (Module 3) ── */}
+              {forecastZone.start && forecastZone.end && (
+                <ReferenceArea
+                  x1={forecastZone.start}
+                  x2={forecastZone.end}
+                  fill="#8b5cf6"
+                  fillOpacity={0.06}
+                  stroke="#8b5cf6"
+                  strokeOpacity={0.2}
+                  strokeWidth={1}
+                  label={{ value: 'AI Forecast Zone', position: 'insideTopLeft', fill: '#8b5cf6', fontSize: 10, fontWeight: 600 }}
+                />
+              )}
 
               {/* Today reference line */}
               {todayMarker && (
