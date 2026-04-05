@@ -172,12 +172,8 @@ def analytics_turnover_rate(request):
     """
     Classify every InventoryItem by its average daily consumption over the
     last 30 days and return bucketed counts + per-item detail.
-
-    Buckets:
-      Fast Moving   : avg_daily > 10
-      Medium Moving : 2 < avg_daily <= 10
-      Slow Moving   : 0 < avg_daily <= 2
-      Non Moving    : avg_daily == 0
+    Also calculates Inventory Turnover Rate: Cost of Goods Sold (COGS) / Average Inventory.
+    Approximate for 30 days: (Total Units Consumed) / (Avg Quantity in Stock).
     """
     PERIOD_DAYS = 30
     cutoff = date.today() - timedelta(days=PERIOD_DAYS)
@@ -215,6 +211,16 @@ def analytics_turnover_rate(request):
 
     item_details.sort(key=lambda x: x["avg_daily"], reverse=True)
 
+    # Turnover rate calculation
+    total_consumed_all = DailyConsumption.objects.filter(
+        date__gte=cutoff, is_valid=True
+    ).aggregate(total=Sum("quantity_used"))["total"] or 0
+    
+    total_stock = InventoryStock.objects.aggregate(total=Sum("quantity_available"))["total"] or 1
+    
+    annualized_rate = (float(total_consumed_all) / float(total_stock)) * (365 / PERIOD_DAYS)
+    safe_rate = round(min(max(annualized_rate, 1.2), 18.5), 1)
+
     return Response({
         "buckets": [
             {"name": "Fast Moving",   "value": fast,       "color": "#10b981", "threshold": "> 10 units/day"},
@@ -224,37 +230,8 @@ def analytics_turnover_rate(request):
         ],
         "items": item_details,
         "period_days": PERIOD_DAYS,
-    })
-
-
-@api_view(["GET"])
-def analytics_turnover_rate(request):
-    """
-    Calculates Inventory Turnover Rate: Cost of Goods Sold (COGS) / Average Inventory.
-    Approximate for 30 days: (Total Units Consumed * Avg Cost) / (Avg Quantity in Stock * Avg Cost)
-    Simplifies to: Total Units Consumed / Current Units in Stock (adjusted for 30d).
-    """
-    PERIOD = 30
-    cutoff = date.today() - timedelta(days=PERIOD)
-    
-    total_consumed = DailyConsumption.objects.filter(
-        date__gte=cutoff, is_valid=True
-    ).aggregate(total=Sum("quantity_used"))["total"] or 0
-    
-    total_stock = StockLevel.objects.aggregate(total=Sum("quantity_available"))["total"] or 1
-    
-    # Simple Turnover = Sales_Units / Avg_Stock_Units
-    # We'll normalize to an annual rate or just show the monthly velocity.
-    # For a SaaS product, usually we show Annualized Turnover.
-    annualized_rate = (float(total_consumed) / float(total_stock)) * (365 / PERIOD)
-    
-    # Ensure it's not some crazy outlier if data is sparse
-    safe_rate = round(min(max(annualized_rate, 1.2), 18.5), 1)
-
-    return Response({
         "turnover_rate": safe_rate,
-        "period_days": PERIOD,
-        "total_consumed": total_consumed,
+        "total_consumed": total_consumed_all,
         "total_stock": total_stock
     })
 
