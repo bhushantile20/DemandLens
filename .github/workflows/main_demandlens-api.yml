@@ -147,6 +147,39 @@
 
 
 
+# name: Deploy Django Backend
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# permissions:
+#   id-token: write
+#   contents: read
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Login to Azure
+#         uses: azure/login@v2
+#         with:
+#           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6393A4BD8BF64FDE879FA4A86B5F562D }}
+#           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6A4ADFAC6D76488BAEEBD48A4B537413 }}
+#           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B3D78C4D855949D7985413F31C03FC45 }}
+
+#       - name: Deploy ONLY backend
+#         uses: azure/webapps-deploy@v3
+#         with:
+#           app-name: demandlens-api
+#           slot-name: Production
+#           package: ./backend
+
+
 name: Deploy Django Backend
 
 on:
@@ -172,9 +205,10 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6A4ADFAC6D76488BAEEBD48A4B537413 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B3D78C4D855949D7985413F31C03FC45 }}
 
-      - name: Deploy ONLY backend
+      - name: Deploy Backend with Build
         uses: azure/webapps-deploy@v3
         with:
           app-name: demandlens-api
           slot-name: Production
           package: ./backend
+          enable-oryx-build: true   # 🔥 THIS IS THE KEY
