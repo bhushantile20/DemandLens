@@ -8,6 +8,7 @@ import {
   DollarSign,
   LogOut,
   Settings,
+  Database,
 } from "lucide-react";
 
 
@@ -33,6 +34,12 @@ const NAV_GROUPS = [
       { name: "Demand Forecast", icon: TrendingUp,   path: "/forecasting"  },
       { name: "Stock Health",    icon: Activity,     path: "/health"       },
       { name: "Stock Value",     icon: DollarSign,   path: "/stock-value"  },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { name: "Data Management", icon: Database,     path: "/data"         },
     ],
   },
 ];

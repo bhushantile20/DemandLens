@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   getDashboardSummary, getItems, getAlerts, runForecast,
   getItemForecast, getDepartmentConsumption, getAbcRanking, getInventoryHealth,
-  getTurnoverRate, getStockValueByCategory
+  getTurnoverRate, getStockValueByCategory, getMacroTrend
 } from '../services/api';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, Legend, ComposedChart, Area,
+  AreaChart, Area, LineChart, Line, CartesianGrid, Legend, ComposedChart,
   PieChart, Pie, Cell, ReferenceLine, ScatterChart, Scatter, ZAxis, ReferenceArea, LabelList
 } from 'recharts';
 import { Activity, Package, AlertTriangle, AlertCircle, RefreshCw, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Repeat, Target } from 'lucide-react';
@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [healthData, setHealthData]     = useState(null);
   const [turnoverData, setTurnoverData] = useState(null);
   const [stockValueData, setStockValueData] = useState([]);
+  const [macroTrend, setMacroTrend]     = useState([]);
   const [loading, setLoading]           = useState(true);
   const [runningForecast, setRunningForecast] = useState(false);
 
@@ -109,24 +110,26 @@ export default function Dashboard() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [sumRes, itemsRes, alertsRes, deptRes, abcRes, healthRes, turnRes, stockValueRes] = await Promise.all([
+      const [sumRes, itemsRes, alertsRes, deptRes, abcRes, healthRes, turnRes, stockValueRes, macroRes] = await Promise.all([
         getDashboardSummary(),
         getItems(),
         getAlerts(),
         getDepartmentConsumption(),
         getAbcRanking(),
         getInventoryHealth(),
-        getTurnoverRate().catch(() => ({ data: { turnover_rate: 4.2 } })), // fallback
-        getStockValueByCategory().catch(() => ({ data: [] }))
+        getTurnoverRate().catch(() => ({ data: { turnover_rate: 4.2 } })),
+        getStockValueByCategory().catch(() => ({ data: [] })),
+        getMacroTrend().catch(() => ({ data: [] }))
       ]);
       setSummary(sumRes.data);
       setItems(itemsRes.data);
       setAlerts(alertsRes.data);
       setDeptData(deptRes.data);
-      setAbcData(abcRes.data.slice(0, 10)); // Top 10 for Pareto
+      setAbcData(abcRes.data.slice(0, 10));
       setHealthData(healthRes.data);
       setTurnoverData(turnRes.data);
       setStockValueData(stockValueRes.data);
+      setMacroTrend(macroRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -736,6 +739,104 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* ══ ROW 7 (Footer): Macro Demand Trend ══ */}
+      {macroTrend.length > 0 && (() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const hasForecast = macroTrend.some(d => d.forecast != null);
+        // Format date labels: short month+day
+        const formatted = macroTrend.map(d => ({
+          ...d,
+          label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+        }));
+        const maxVal = Math.max(...macroTrend.map(d => Math.max(d.actual || 0, d.forecast || 0)));
+
+        return (
+          <div className="bg-white border border-slate-100 rounded-xl shadow-sm p-5 mb-6 opacity-80 hover:opacity-100 transition-opacity">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-slate-900 text-sm">System-wide Demand Trend</h3>
+                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">Live · AI Powered</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                  <span className="w-2.5 h-2 rounded-sm inline-block" style={{ background: 'rgba(59,130,246,0.5)' }} />
+                  Historical (14d)
+                </span>
+                {hasForecast && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                    <span className="w-2.5 h-0.5 inline-block bg-violet-400" style={{ borderTop: '2px dashed #a78bfa' }} />
+                    AI Forecast (7d)
+                  </span>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 mb-4 ml-6">Total units consumed across all departments daily · Dashed line = LSTM prediction</p>
+
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={formatted} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradActualFooter" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradForecastFooter" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false} tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                  interval={Math.floor(formatted.length / 7)}
+                />
+                <YAxis
+                  axisLine={false} tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                  domain={[0, Math.ceil(maxVal * 1.15)]}
+                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(1)}K` : v}
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                  formatter={(value, name) => [
+                    value != null ? `${Number(value).toFixed(0)} units` : 'N/A',
+                    name === 'actual' ? 'Actual Consumption' : 'AI Forecast'
+                  ]}
+                  labelFormatter={l => `Date: ${l}`}
+                />
+                {/* Today reference line */}
+                <ReferenceLine
+                  x={formatted.find(d => d.date === todayStr)?.label}
+                  stroke="#cbd5e1"
+                  strokeDasharray="4 3"
+                  label={{ value: 'Today', position: 'top', fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                />
+                <Area
+                  type="monotone" dataKey="actual" name="actual"
+                  stroke="#3b82f6" strokeWidth={2.5}
+                  fill="url(#gradActualFooter)"
+                  dot={false}
+                  connectNulls={false}
+                />
+                {hasForecast && (
+                  <Area
+                    type="monotone" dataKey="forecast" name="forecast"
+                    stroke="#a78bfa" strokeWidth={2}
+                    strokeDasharray="6 4"
+                    fill="url(#gradForecastFooter)"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
     </div>
   );
 }

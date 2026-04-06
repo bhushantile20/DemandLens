@@ -36,4 +36,15 @@ export const updateEmail = (email) =>
 export const updatePassword = (current_password, new_password) =>
   api.put('/user/update-password/', { current_password, new_password });
 
+// ─── Data management endpoints ────────────────────────────────────
+export const uploadCSV = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post('/data/upload-csv/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
 export default api;

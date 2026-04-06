@@ -93,7 +93,7 @@ export default function Navbar() {
       {/* Left – breadcrumb + title */}
       <div>
         <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">
-          InventoryAI
+          DemandLens
         </p>
         <h1 className="text-sm font-bold text-slate-800 leading-none mt-0.5">
           {title}

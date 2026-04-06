@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from . import views_data
 
 urlpatterns = [
     path("dashboard/summary", views.dashboard_summary, name="dashboard-summary"),
@@ -10,6 +11,9 @@ urlpatterns = [
     path("alerts/reorder/", views.alerts_reorder, name="alerts-reorder"),
     path("data-quality/issues/", views.data_quality_issues, name="data-quality-issues"),
     path("forecast/run/", views.forecast_run, name="forecast-run"),
+
+    # ── Data Ingestion ────────────────────────────────────────────
+    path("data/upload-csv/", views_data.upload_csv, name="data-upload-csv"),
 
     # ── Analytics endpoints ───────────────────────────────────────
     path("analytics/department-consumption/", views.analytics_department_consumption, name="analytics-department"),

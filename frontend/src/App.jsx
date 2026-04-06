@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 
-import Sidebar    from "./components/Sidebar";
-import Navbar     from "./components/Navbar";
+import Sidebar        from "./components/Sidebar";
+import Navbar         from "./components/Navbar";
+import PageTransition from "./components/PageTransition";
 
 import Home        from "./pages/Home";
 import Login       from "./pages/Login";
@@ -16,6 +17,7 @@ import Forecasting    from './pages/Forecasting';
 import InventoryHealth from './pages/InventoryHealth';
 import StockValue      from './pages/StockValue';
 import Settings    from "./pages/Settings";
+import DataManagement from "./pages/DataManagement";
 
 
 
@@ -40,26 +42,29 @@ function AppShell({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* ── Full-page public routes (NO sidebar, NO navbar) ── */}
-        <Route path="/"         element={<Home />} />
-        <Route path="/login"    element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <PageTransition>
+        <Routes>
+          {/* ── Full-page public routes (NO sidebar, NO navbar) ── */}
+          <Route path="/"         element={<Home />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* ── App routes — each explicitly wrapped in AppShell ── */}
-        <Route path="/dashboard"     element={<AppShell><Dashboard /></AppShell>} />
-        <Route path="/items"         element={<AppShell><ItemsList /></AppShell>} />
-        <Route path="/items/:id"     element={<AppShell><ItemDetail /></AppShell>} />
-        <Route path="/forecasting"    element={<AppShell><Forecasting /></AppShell>} />
-        <Route path="/health"         element={<AppShell><InventoryHealth /></AppShell>} />
-        <Route path="/stock-value"    element={<AppShell><StockValue /></AppShell>} />
-        <Route path="/alerts"        element={<AppShell><Alerts /></AppShell>} />
-        <Route path="/data-quality"  element={<AppShell><DataQuality /></AppShell>} />
-        <Route path="/settings"      element={<AppShell><Settings /></AppShell>} />
+          {/* ── App routes — each explicitly wrapped in AppShell ── */}
+          <Route path="/dashboard"     element={<AppShell><Dashboard /></AppShell>} />
+          <Route path="/items"         element={<AppShell><ItemsList /></AppShell>} />
+          <Route path="/items/:id"     element={<AppShell><ItemDetail /></AppShell>} />
+          <Route path="/forecasting"   element={<AppShell><Forecasting /></AppShell>} />
+          <Route path="/health"        element={<AppShell><InventoryHealth /></AppShell>} />
+          <Route path="/stock-value"   element={<AppShell><StockValue /></AppShell>} />
+          <Route path="/alerts"        element={<AppShell><Alerts /></AppShell>} />
+          <Route path="/data-quality" element={<AppShell><DataQuality /></AppShell>} />
+          <Route path="/data"          element={<AppShell><DataManagement /></AppShell>} />
+          <Route path="/settings"      element={<AppShell><Settings /></AppShell>} />
 
-        {/* ── Catch-all ── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* ── Catch-all ── */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </PageTransition>
     </BrowserRouter>
   );
 }
