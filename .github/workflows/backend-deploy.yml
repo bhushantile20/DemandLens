@@ -1,54 +1,54 @@
-name: Deploy backend to Azure App Service
+# name: Deploy backend to Azure App Service
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-deploy.yml'
-  workflow_dispatch:
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'backend/**'
+#       - '.github/workflows/backend-deploy.yml'
+#   workflow_dispatch:
 
-env:
-  AZURE_WEBAPP_NAME: demandlens-backend  # You will update this to your Azure App Service Name
-  PYTHON_VERSION: '3.11'
+# env:
+#   AZURE_WEBAPP_NAME: demandlens-backend  # You will update this to your Azure App Service Name
+#   PYTHON_VERSION: '3.11'
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#     - uses: actions/checkout@v4
 
-    - name: Set up Python version
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
+#     - name: Set up Python version
+#       uses: actions/setup-python@v5
+#       with:
+#         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install dependencies
-      run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+#     - name: Install dependencies
+#       run: |
+#         cd backend
+#         python -m pip install --upgrade pip
+#         pip install -r requirements.txt
         
-    - name: Collect Static Files
-      run: |
-        cd backend
-        # We set dummy env vars just to allow Django to boot for collectstatic
-        export DJANGO_SECRET_KEY="dummy"
-        export DB_NAME="dummy"
-        export DB_USER="dummy"
-        export DB_PASSWORD="dummy"
-        export DB_HOST="dummy"
-        python manage.py collectstatic --noinput
+#     - name: Collect Static Files
+#       run: |
+#         cd backend
+#         # We set dummy env vars just to allow Django to boot for collectstatic
+#         export DJANGO_SECRET_KEY="dummy"
+#         export DB_NAME="dummy"
+#         export DB_USER="dummy"
+#         export DB_PASSWORD="dummy"
+#         export DB_HOST="dummy"
+#         python manage.py collectstatic --noinput
 
-    - name: Zip artifact for deployment
-      run: |
-        cd backend
-        zip -r ../release.zip ./* -x "venv/*" -x "__pycache__/*" -x "db.sqlite3"
+#     - name: Zip artifact for deployment
+#       run: |
+#         cd backend
+#         zip -r ../release.zip ./* -x "venv/*" -x "__pycache__/*" -x "db.sqlite3"
 
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: release.zip
+#     - name: Deploy to Azure Web App
+#       uses: azure/webapps-deploy@v3
+#       with:
+#         app-name: ${{ env.AZURE_WEBAPP_NAME }}
+#         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+#         package: release.zip
