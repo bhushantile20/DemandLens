@@ -1,4 +1,4 @@
-﻿aiodns==4.0.0
+aiodns==4.0.0
 aiofiles==25.1.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.3
@@ -46,7 +46,7 @@ databricks-sdk==0.96.0
 databricks-sql-connector==4.2.5
 deprecation==2.1.0
 distro==1.9.0
-Django==5.1.0
+Django==4.2.7
 django-celery-beat==2.9.0
 django-cors-headers==4.9.0
 django-environ==0.13.0
