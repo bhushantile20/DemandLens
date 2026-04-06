@@ -3,10 +3,9 @@ module.exports = {
     {
       name: "demandlens-backend",
       cwd: "./backend",
-      // If you are using a virtual environment, replace "python" with the path to your venv python executable
-      // e.g., "venv/Scripts/python" or "env/Scripts/python"
-      script: "venv/Scripts/python.exe",
-      args: "-m waitress --host=0.0.0.0 --port=8000 config.wsgi:application",
+      // On Linux, the virtual environment executable is in venv/bin
+      script: "venv/bin/python",
+      args: "manage.py runserver 0.0.0.0:8000",
       watch: false,
       env: {
         "DJANGO_SETTINGS_MODULE": "config.settings",
