@@ -86,7 +86,7 @@ jobs:
         with:
           app-name: demandlens-api
           slot-name: Production
-          package: .
+          package: backend
 
 
 
