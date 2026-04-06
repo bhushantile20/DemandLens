@@ -29,13 +29,24 @@ SECRET_KEY = 'django-insecure-p-#=c0c0-k3gb6$hg)a+jd&m3ydj8y89i@q@26hclc_nfez5-+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',')] if os.getenv('ALLOWED_HOSTS') else []
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',')] if os.getenv('ALLOWED_HOSTS') else ['localhost', '127.0.0.1']
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173", "https://demandlens-ui-gmejcpc0ebc8c0hu.southeastasia-01.azurewebsites.net"
+    "http://localhost:5173",
+    "https://demandlens-ui-gmejcpc0ebc8c0hu.southeastasia-01.azurewebsites.net"
 ]
 if os.getenv('CORS_ALLOWED_ORIGINS'):
     CORS_ALLOWED_ORIGINS += [origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS').split(',')]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "https://demandlens-ui-gmejcpc0ebc8c0hu.southeastasia-01.azurewebsites.net"
+]
+if os.getenv('CSRF_TRUSTED_ORIGINS'):
+    CSRF_TRUSTED_ORIGINS += [origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS').split(',')]
+elif os.getenv('CORS_ALLOWED_ORIGINS'):
+    # Default to sync with CORS origins if specific CSRF origins aren't provided
+    CSRF_TRUSTED_ORIGINS += [origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS').split(',')]
 
 CORS_ALLOW_HEADERS = [
     "accept",
