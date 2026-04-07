@@ -44,7 +44,7 @@
 | Enterprise Pain Point | The DemandLens Solution |
 |---|---|
 | Manual stockout tracking | Automated critical-stock thresholds and immediate alert generation. |
-| Guesswork in supply chain | **Multi-model AI forecasting** (LSTM, Random Forest, ETS) looking 7 days ahead. |
+| Guesswork in supply chain | **Multi-model AI forecasting** (LSTM, Random Forest, ARIMA) looking 7 days ahead. |
 | Clunky Excel updates | **Smart Data Management Module** with unified drag-and-drop CSV importing. |
 | Dead capital / Overstock | Pareto (ABC) Analysis, Real-time Inventory Turnover Rates, and Risk Scatter Plots. |
 | Slow Onboarding | High-conversion SaaS Registration and instant Demo Login access. |
@@ -106,7 +106,7 @@
 DemandLens natively incorporates three distinct forecasting algorithms within Python, evaluating and selecting the most accurate prediction baseline tailored to individual SKU velocity:
 
 1. **LSTM (Long Short-Term Memory) Neural Networks:** Captures deep, non-linear macroscopic trends across the entire supply chain footprint.
-2. **Exponential Smoothing (ETS):** Baseline standard (via `statsmodels`) utilized for highly seasonal or predictable items with ≥7 days of history.
+2. **ARIMA (AutoRegressive Integrated Moving Average):** Baseline autoregressive standard (via `statsmodels`) utilized for highly seasonal or predictable items with ≥7 days of history.
 3. **Random Forest Ensembles:** Employed to mitigate sudden spikes and manage erratic consumption behavior through decision-tree averaging.
 
 **Enterprise AI Features:**
@@ -148,9 +148,9 @@ sequenceDiagram
     rect rgb(34, 43, 54)
     Note over AI: 🧠 Start AI Evaluation
     AI->>AI: Generate Random Forest Ensemble
-    AI->>AI: Generate StatsModels ETS
+    AI->>AI: Generate StatsModels ARIMA
     AI->>AI: Compute LSTM Activation Flow
-    AI->>AI: Isolate lowest MAPE (highest accuracy)
+    AI->>AI: Calculate Inverse MAPE Ensemble Weighting
     end
     
     AI-->>API: Return Best Model & Outlier/Anomaly Flags
@@ -170,7 +170,7 @@ DemandLens/
 ├── backend/                  # Django Python Server Environment
 │   ├── api/                  # Main platform endpoints & User Authentication views
 │   ├── config/               # Base Django logic (settings.py, base URLs, WSGI)
-│   ├── forecasting/          # 🧠 AI Engine - LSTM, Random Forest & ETS Math Models
+│   ├── forecasting/          # 🧠 AI Engine - LSTM, Random Forest & ARIMA Math Models
 │   ├── inventory/            # DB Models: Items, Suppliers, Stock Management
 │   ├── alerts/               # Analytics logic calculating reorder points & thresholds
 │   ├── manage.py             # Django entry initialization
