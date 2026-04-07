@@ -1,9 +1,16 @@
 import numpy as np
 import logging
+
+# Set seed for numpy reproducibility
+np.random.seed(42)
+
 try:
     import torch
     import torch.nn as nn
     from torch.utils.data import DataLoader, TensorDataset
+    
+    # Set seed for torch reproducibility
+    torch.manual_seed(42)
 except ImportError:
     torch = None
 
