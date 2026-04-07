@@ -61,11 +61,14 @@
 | AI Executive Dashboard | Multi-Model Probability & Charting |
 | :---: | :---: |
 | ![Dashboard Placeholder](<img width="1908" height="983" alt="image" src="https://github.com/user-attachments/assets/4ac55f2b-a5fa-4dca-b60b-56ea44b5baf1" />
-) <br> *(Replace with: `docs/assets/dashboard.png`)* | ![Forecast Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Forecast+Screenshot+Here) <br> *(Replace with: `docs/assets/forecast.png`)* |
+) <br> *(Replace with: `docs/assets/dashboard.png`)* | ![Forecast Placeholder](<img width="1919" height="983" alt="image" src="https://github.com/user-attachments/assets/b80eb173-0623-45bc-b08b-033d18bbf559" />
+) <br> *(Replace with: `docs/assets/forecast.png`)* |
 
-| Data Ingestion Module | Inventory Risk Distribution |
+| Stock Health | Reorder Alert |
 | :---: | :---: |
-| ![Data Upload Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Data+Module+Screenshot) <br> *(Replace with: `docs/assets/data-management.png`)* | ![Risk Matrix Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Risk+Matrix+Screenshot) <br> *(Replace with: `docs/assets/risk-matrix.png`)* |
+| ![Data Upload Placeholder](<img width="1919" height="990" alt="image" src="https://github.com/user-attachments/assets/dafa6b28-524c-47eb-ae14-f0b35a4949cd" />
+) <br> *(Replace with: `docs/assets/data-management.png`)* | ![Risk Matrix Placeholder](<img width="1917" height="982" alt="image" src="https://github.com/user-attachments/assets/d89b5df0-0e2b-4d3a-86d1-ba9094679aaa" />
+) <br> *(Replace with: `docs/assets/risk-matrix.png`)* |
 
 *(Create a `/docs/assets/` folder in your project, save your screenshots there, and inject the paths in the Markdown table above!)*
 
