@@ -60,21 +60,23 @@
 
 | AI Executive Dashboard | Multi-Model Probability & Charting |
 | :---: | :---: |
-| ![Dashboard Placeholder](<img width="1908" height="983" alt="image" src="https://github.com/user-attachments/assets/4ac55f2b-a5fa-4dca-b60b-56ea44b5baf1" />
-) <br> | ![Forecast Placeholder](<img width="1919" height="983" alt="image" src="https://github.com/user-attachments/assets/b80eb173-0623-45bc-b08b-033d18bbf559" />
-) <br>  |
+| <img src="https://github.com/user-attachments/assets/4ac55f2b-a5fa-4dca-b60b-56ea44b5baf1" width="100%"/> | <img src="https://github.com/user-attachments/assets/b80eb173-0623-45bc-b08b-033d18bbf559" width="100%"/> |
 
 | Stock Health | Reorder Alert |
 | :---: | :---: |
-| ![Data Upload Placeholder](<img width="1919" height="990" alt="image" src="https://github.com/user-attachments/assets/dafa6b28-524c-47eb-ae14-f0b35a4949cd" />
-) <br> *(Replace with: `docs/assets/data-management.png`)* | ![Risk Matrix Placeholder](<img width="1917" height="982" alt="image" src="https://github.com/user-attachments/assets/d89b5df0-0e2b-4d3a-86d1-ba9094679aaa" />
-) <br>  |
+| <img src="https://github.com/user-attachments/assets/dafa6b28-524c-47eb-ae14-f0b35a4949cd" width="100%"/> | <img src="https://github.com/user-attachments/assets/d89b5df0-0e2b-4d3a-86d1-ba9094679aaa" width="100%"/> |
 
+<br>
+
+### 📊 Additional Views
+
+<img src="https://github.com/user-attachments/assets/3be4497c-fa82-470d-a18d-49a3826977f0" width="100%"/>
+
+<br>
+
+<img src="https://github.com/user-attachments/assets/828bad71-8262-45bd-8201-5108d6729e86" width="100%"/>
 
 </details>
-
----
-
 ## ✨ Features & Capabilities
 
 ### 📊 Executive Dashboard
