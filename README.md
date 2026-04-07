@@ -57,7 +57,8 @@
 
 | AI Executive Dashboard | Multi-Model Probability & Charting |
 | :---: | :---: |
-| ![Dashboard Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Dashboard+Screenshot+Here) <br> *(Replace with: `docs/assets/dashboard.png`)* | ![Forecast Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Forecast+Screenshot+Here) <br> *(Replace with: `docs/assets/forecast.png`)* |
+| ![Dashboard Placeholder](<img width="1908" height="983" alt="image" src="https://github.com/user-attachments/assets/4ac55f2b-a5fa-4dca-b60b-56ea44b5baf1" />
+) <br> *(Replace with: `docs/assets/dashboard.png`)* | ![Forecast Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Forecast+Screenshot+Here) <br> *(Replace with: `docs/assets/forecast.png`)* |
 
 | Data Ingestion Module | Inventory Risk Distribution |
 | :---: | :---: |
