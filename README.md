@@ -51,9 +51,12 @@
 
 ---
 
-## 🖼️ Application Gallery (Screenshots)
+## 🖼️ Application Gallery
 
-*(Add screenshots of your application to this section to give users a visual preview of the project)*
+<details>
+<summary><b>📸 Click to view Project Screenshots</b></summary>
+
+<br>
 
 | AI Executive Dashboard | Multi-Model Probability & Charting |
 | :---: | :---: |
@@ -65,6 +68,8 @@
 | ![Data Upload Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Data+Module+Screenshot) <br> *(Replace with: `docs/assets/data-management.png`)* | ![Risk Matrix Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Risk+Matrix+Screenshot) <br> *(Replace with: `docs/assets/risk-matrix.png`)* |
 
 *(Create a `/docs/assets/` folder in your project, save your screenshots there, and inject the paths in the Markdown table above!)*
+
+</details>
 
 ---
 
