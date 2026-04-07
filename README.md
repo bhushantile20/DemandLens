@@ -16,7 +16,7 @@
 
 ---
 
-[Features](#-features--capabilities) · [AI Models](#-ai-forecasting-engine) · [Tech Stack](#-tech-stack) · [Deployment](#-system-architecture--deployment) · [Setup Guide](#-getting-started) · [API](#-api-reference)
+[Overview](#-project-overview) · [Gallery](#️-application-gallery-screenshots) · [Features](#-features--capabilities) · [AI Models](#-ai-forecasting-engine) · [Architecture Flow](#-system-architecture--sequence-flow) · [Setup Guide](#-getting-started)
 
 </div>
 
@@ -25,14 +25,13 @@
 ## 📋 Table of Contents
 
 1. [Project Overview](#-project-overview)
-2. [Latest Updates](#-latest-updates-v20)
+2. [Application Gallery](#️-application-gallery-screenshots)
 3. [Features & Capabilities](#-features--capabilities)
 4. [AI Forecasting Engine](#-ai-forecasting-engine)
-5. [Tech Stack](#-tech-stack)
-6. [System Architecture & Deployment](#-system-architecture--deployment)
-7. [Database Schema](#-database-schema)
-8. [Getting Started](#-getting-started)
-9. [API Reference](#-api-reference)
+5. [System Architecture & Sequence Flow](#-system-architecture--sequence-flow)
+6. [Project Folder Structure (For Beginners)](#-project-folder-structure-for-beginners)
+7. [Getting Started](#-getting-started)
+8. [API Reference](#-api-reference)
 
 ---
 
@@ -48,18 +47,23 @@
 | Guesswork in supply chain | **Multi-model AI forecasting** (LSTM, Random Forest, ETS) looking 7 days ahead. |
 | Clunky Excel updates | **Smart Data Management Module** with unified drag-and-drop CSV importing. |
 | Dead capital / Overstock | Pareto (ABC) Analysis, Real-time Inventory Turnover Rates, and Risk Scatter Plots. |
+| Slow Onboarding | High-conversion SaaS Registration and instant Demo Login access. |
 
 ---
 
-## 📢 Latest Updates (v2.0)
+## 🖼️ Application Gallery (Screenshots)
 
-We have recently evolved the platform with enterprise SaaS capabilities and deeper analytics:
+*(Add screenshots of your application to this section to give users a visual preview of the project)*
 
-*   **Premium SaaS Interface:** A brand-new, high-conversion landing page and streamlined user registration/login flow providing a premium enterprise feel.
-*   **Intelligent Data Management:** A dedicated module for bulk CSV inventory uploads. Features "Smart Add" reasoning that updates existing stock quantities rather than overwriting data, and auto-generates entities for unmapped categories.
-*   **Advanced Forecasting UI:** The AI engine now displays **Data Anomaly Detection Markers** (identifying extreme outliers in consumption), custom clickable chart legends to isolate model projections, and one-click data unloads via direct CSV Export.
-*   **Refined Analytics Dashboard:** Streamlined real-time KPIs showing live **Inventory Turnover Rates** and optimized Capital Distribution stats.
-*   **Robust Production Deployment:** Integrated PM2 process management for zero-downtime background execution and implemented CI/CD pipelines enabling seamless Azure Web Apps deployments directly from GitHub Actions.
+| AI Executive Dashboard | Multi-Model Probability & Charting |
+| :---: | :---: |
+| ![Dashboard Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Dashboard+Screenshot+Here) <br> *(Replace with: `docs/assets/dashboard.png`)* | ![Forecast Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Forecast+Screenshot+Here) <br> *(Replace with: `docs/assets/forecast.png`)* |
+
+| Data Ingestion Module | Inventory Risk Distribution |
+| :---: | :---: |
+| ![Data Upload Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Data+Module+Screenshot) <br> *(Replace with: `docs/assets/data-management.png`)* | ![Risk Matrix Placeholder](https://via.placeholder.com/600x300.png?text=Upload+Risk+Matrix+Screenshot) <br> *(Replace with: `docs/assets/risk-matrix.png`)* |
+
+*(Create a `/docs/assets/` folder in your project, save your screenshots there, and inject the paths in the Markdown table above!)*
 
 ---
 
@@ -73,9 +77,8 @@ We have recently evolved the platform with enterprise SaaS capabilities and deep
 
 ### 🗄️ Smart Data Management
 - **Bulk CSV Ingestion:** Premium drag-and-drop zone for rapid Excel/CSV inventory mapping.
-- **Intelligent "Smart Add":** Automatically detects existing items and securely *adds* quantity to existing stock.
+- **Intelligent "Smart Add":** Automatically detects existing items and securely *adds* quantity to existing stock without overwriting historical data.
 - **Automated Entity Generation:** Instantly handles and structures unknown suppliers and categories on the fly.
-- **Client-Side Templating:** Instant "Download Template" generator for faultless formatting.
 
 ### 🚨 Reorder Intelligence Base
 - Generates exact reorder quantity parameters = *(forecasted demand + buffer) − projected stock*.
@@ -103,50 +106,81 @@ DemandLens natively incorporates three distinct forecasting algorithms within Py
 
 ---
 
-## 🛠 Tech Stack
+## 🏗 System Architecture & Sequence Flow
 
-### Frontend Application
-| Technology | Description |
-|---|---|
-| **React 19 & Vite 8** | High-performance core SPA component framework and build tool |
-| **Tailwind CSS 4** | Utility-first styling with custom glassmorphic and enterprise configurations |
-| **Framer Motion** | Physics-based UI animations, page transitions, and interactive loading states |
-| **Recharts** | Interactive SVG-rendered charting library mapped to live API streams |
+DemandLens utilizes a robust production deployment architecture designed for High Availability. Deployable both via containerized Azure Web Apps or self-hosted PM2 persistent execution.
 
-### API & Analysis Engine
-| Technology | Description |
-|---|---|
-| **Django 6.0 & DRF** | Web framework and robust REST API layer mapping a normalized PostgreSQL ORM |
-| **Pandas / Statsmodels** | Core data manipulation, automated outlier detection, and ETS statistical modeling |
-| **NumPy & Scikit-Learn** | High performance tensor mathematics, regression algorithms, and Random Forest models |
-| **TensorFlow/Keras** | Powering the LSTM deep-learning neural network architectures |
+### Data Flow & Logic Sequence
+
+This sequence outlines the lifecycle of a user uploading data and deriving an AI-driven Reorder Alert.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Supply Chain User
+    participant CLI as React Frontend
+    participant API as Django API Service
+    participant DB as PostgreSQL DB
+    participant AI as AI Engine (SciKit/TF)
+    
+    U->>CLI: Drag & Drop CSV Data
+    CLI->>API: POST /data/upload-csv/
+    API->>DB: Evaluate "Smart Add" & Update Stock
+    DB-->>API: Rows Synchronized
+    API-->>CLI: Success Response
+    
+    U->>CLI: Request Demand Recommendation
+    CLI->>API: POST /forecast/run/
+    API->>DB: Query 2-Year Trailing Consumption
+    DB-->>API: Return Array of Demand Data
+    API->>AI: Trigger Forecast Engines
+    
+    rect rgb(34, 43, 54)
+    Note over AI: 🧠 Start AI Evaluation
+    AI->>AI: Generate Random Forest Ensemble
+    AI->>AI: Generate StatsModels ETS
+    AI->>AI: Compute LSTM Activation Flow
+    AI->>AI: Isolate lowest MAPE (highest accuracy)
+    end
+    
+    AI-->>API: Return Best Model & Outlier/Anomaly Flags
+    API->>DB: Record ForecastResult & Alert Level
+    API-->>CLI: Render Recharts with Recommendations
+    CLI-->>U: Display Visual Forecast & Actions
+```
 
 ---
 
-## 🏗 System Architecture & Deployment
+## 📁 Project Folder Structure (For Beginners)
 
-DemandLens utilizes a robust production deployment architecture designed for High Availability. 
+If you are new to the codebase, here is the high-level map of where essential logic is housed:
 
-### CI/CD Pipeline (`deploy.yml`)
-The platform supports an automated **GitHub Actions** CI/CD pipeline triggered upon merges to the `main` branch. 
-
-**Deployment Targets:**
-1. **Azure Web Apps (PaaS):** Oryx-based build configurations mapping `requirements.txt` optimizations with isolated Python 3.11 runtimes on Azure App Services.
-2. **Virtual Machines / Self-hosted:** 
-    - Executes isolated `git pull`, automated environment creation, and Python DB migration commands.
-    - Utilizes **PM2** via an explicit `ecosystem.config.js` to ensure zero-downtime backend restarts, automatic crash-restarts, and persistent process execution without manual ssh-hangups.
-
----
-
-## 🗄 Database Schema
-
-The DemandLens database is normalized for high-velocity supply chain reads and analytics.
-
-**Core Entities:**
-*   `Supplier` / `InventoryItem` / `InventoryStock`: Foundation structural map grouping categories with real-time on-hand quantites.
-*   `DailyConsumption`: Highly indexed historical transaction logs (Quantity Used, Date, Department).
-*   `ForecastResult` & `ReorderRecommendation`: Evaluated alert states and exact mathematically suggested order scales, explicit to the AI model used.
-*   `DataQualityIssue`: System-generated flags highlighting missing relations, negative inventory alerts, or bad math ingestion.
+```text
+DemandLens/
+├── backend/                  # Django Python Server Environment
+│   ├── api/                  # Main platform endpoints & User Authentication views
+│   ├── config/               # Base Django logic (settings.py, base URLs, WSGI)
+│   ├── forecasting/          # 🧠 AI Engine - LSTM, Random Forest & ETS Math Models
+│   ├── inventory/            # DB Models: Items, Suppliers, Stock Management
+│   ├── alerts/               # Analytics logic calculating reorder points & thresholds
+│   ├── manage.py             # Django entry initialization
+│   ├── requirements.txt      # Python backend dependencies
+│   └── seed_data_enhanced.py # Run this to auto-populate the database with 2 years of demo data!
+│
+├── frontend/                 # React 19 + Vite + Tailwind 4 Application
+│   ├── public/               # Static base assets (Favicon, Template CSVs)
+│   ├── src/
+│   │   ├── components/       # Reusable UI fragments (Navigation, Loaders, Dialogs)
+│   │   ├── pages/            # 🖥️ Core Views (Dashboard.jsx, Forecasting.jsx, Login.jsx)
+│   │   ├── App.jsx           # Main React Router & Authentication Context hub
+│   │   └── index.css         # Custom Tailwind utilities & Glassmorphic variables
+│   ├── package.json          # Node.js frontend dependencies
+│   └── vite.config.js        # Vite compilation rules
+│   
+├── .github/workflows/        # CI/CD pipelines (e.g. deploy.yml for GitHub Actions)
+├── ecosystem.config.js       # PM2 setup for automatic Linux background restarts
+└── README.md                 # You are exactly here 😉
+```
 
 ---
 
@@ -176,9 +210,11 @@ pip install -r requirements.txt
 
 # Configure your environment variables (.env)
 python manage.py migrate
-python seed_data_enhanced.py # Seed database with historical data 
-python manage.py createsuperuser
 
+# Seed database with 2 years of supply chain test data
+python seed_data_enhanced.py
+
+python manage.py createsuperuser
 python manage.py runserver
 ```
 
@@ -203,7 +239,7 @@ Base URL: `http://localhost:8000/api`
 |---|---|---|---|
 | **Auth** | `POST` | `/auth/login/` | Standard user authentication or demo login entry |
 | **Data Ingestion** | `POST` | `/data/upload-csv/` | Handles bulk multipart CSV uploads with "Smart Add" stock resolution |
-| **Analytics** | `GET` | `/analytics/macro-trend/` | 14-day historical ingestion vs 7-day system projection |
+| **Analytics** | `GET` | `/analytics/macro-trend/` | 14-day historical vs 7-day system projection |
 | **Analytics** | `GET` | `/analytics/turnover-rate/` | Velocity calculations and COGS turnover equations |
 | **Items & AI** | `POST` | `/forecast/run/` | Triggers the complete AI Multi-Model generation sequence |
 | **Items & AI** | `GET` | `/items/:id/forecast/` | Isolated robust forecast mapping including anomaly points |
